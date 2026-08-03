@@ -1,30 +1,34 @@
 import streamlit as st
 
-# Your exact function untouched
+# The simpler student-friendly function using strings ("" and +=)
 def cryptoclub_ch01(message):
     plaintext = "abcdefghijklmnopqrstuvwxyz"
     ciphertext = "DEFGHIJKLMNOPQRSTUVWXYZABC"
     
-    encrypted_message = []
+    # 1. Start with a completely empty piece of text
+    encrypted_message = ""
     
     for char in message:
         if char in plaintext:
             number = plaintext.index(char)
-            encrypted_message.append(ciphertext[number])
+            # 2. Glue the secret letter directly onto the end
+            encrypted_message += ciphertext[number]
         else:
-            encrypted_message.append(char)
+            # 3. Glue spaces or punctuation onto the end
+            encrypted_message += char
             
-    return "".join(encrypted_message)
+    return encrypted_message
 
 # --- STREAMLIT INTERFACE ---
 st.title("The Cryptoclub - Chapter 1")
+st.write("This app encrypts lowercase text using a shift of 3.")
 
-# This creates the text box on the screen and captures whatever the user types into 'user_text'
+# Captures what the student types into the box
 user_text = st.text_input("Enter lowercase plaintext:", value="hello world")
 
-# This takes the text from the box, runs your function, and saves it to 'result'
+# Runs the simpler string function
 result = cryptoclub_ch01(user_text)
 
-# This displays the result on the webpage
+# Displays the final secret message
 st.write("**Ciphertext:**")
 st.code(result)
