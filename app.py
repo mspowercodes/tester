@@ -7,13 +7,16 @@ def caesar_cipher_simple(message):
     encrypted_message = ""
     
     for char in message.lower():
-        if char in plain:
+        # FIXED: Changed 'plain' to 'plaintext'
+        if char in plaintext:
             position_plain = plaintext.find(char)
             encrypted_message += ciphertext[position_plain]
         else:
-            text_cipher += char
+            # FIXED: Changed 'text_cipher' to 'encrypted_message'
+            encrypted_message += char
             
-    return text_cipher
+    # FIXED: Changed 'text_cipher' to 'encrypted_message'
+    return encrypted_message
 
 # Streamlit Interface
 st.title("Simple Caesar Cipher")
