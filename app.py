@@ -1,24 +1,21 @@
 import streamlit as st
 
-plaintext = 'abcdefghijklmnopqrstuvwxyz'
-ciphertext = 'DEFGHIJKLMNOPQRSTUVWXYZABC'
-
-def caesar_cipher_simple(message):
-    encrypted_message = ""
+def scramble_vowels(message):
+    new_message = ""
     
-    for char in message.lower():
-        if char in plaintext:
-            position_plain = plaintext.find(char)
-            encrypted_message += ciphertext[position_plain]
+    for char in message:
+        if char == "a":
+            new_message += "@"
+        elif char == "e":
+            new_message += "3"
         else:
-            encrypted_message += char
+            new_message += char
             
-    return encrypted_message
+    return new_message
 
-st.title("Simple Caesar Cipher")
+st.title("Vowel Scrambler")
+user_text = st.text_input("Type a word:", value="apple")
 
-user_message = st.text_input("Enter text to encrypt:", value="hello world")
-
-if user_message:
-    secret_result = caesar_cipher_simple(user_message)
-    st.success(f"Encrypted text: **{secret_result}**")
+if user_text:
+    result = scramble_vowels(user_text)
+    st.success(f"Scrambled: {result}")
