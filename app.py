@@ -1,7 +1,7 @@
 import streamlit as st
 
 # The simpler student-friendly function using strings ("" and +=)
-def cryptoclub_ch01(message):
+def caesar_shift3(message):
     plaintext = "abcdefghijklmnopqrstuvwxyz"
     ciphertext = "DEFGHIJKLMNOPQRSTUVWXYZABC"
     
@@ -27,7 +27,7 @@ st.write("This app encrypts lowercase text using a shift of 3.")
 user_text = st.text_input("Enter lowercase plaintext:", value="hello world")
 
 # Runs the simpler string function
-result = cryptoclub_ch01(user_text)
+result = caesar_shift3(user_text)
 
 # Displays the final secret message
 st.write("**Ciphertext:**")
