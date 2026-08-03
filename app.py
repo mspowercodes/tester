@@ -11,9 +11,9 @@ def caesar_cipher_simple(message):
             position_plain = alphabet_plain.find(char)
             text_cipher += alphabet_encrypt[position]
         else:
-            encrypted_message += char
+            text_cipher += char
             
-    return encrypted_message
+    return text_cipher
 
 # Streamlit Interface
 st.title("Simple Caesar Cipher")
