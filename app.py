@@ -3,4 +3,6 @@ def is_lowercase(char):
         return True
     else:
         return False
+
 print(is_lowercase('g'))
+print(is_lowercase('A'))
