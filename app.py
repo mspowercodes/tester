@@ -6,7 +6,7 @@ ciphertext = 'DEFGHIJKLMNOPQRSTUVWXYZABC'
 def caesar_cipher_simple(message):
     encrypted_message = ""
     
-    for char in message.lower():
+    for char in message:
         if char in plaintext:
             position_plain = plaintext.find(char)
             encrypted_message += ciphertext[position_plain]
