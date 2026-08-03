@@ -7,8 +7,8 @@ def caesar_cipher_simple(message):
     encrypted_message = ""
     
     for char in message.lower():
-        if char in message:
-            position_plain = message.find(char)
+        if char in plaintext:
+            position_plain = plaintext.find(char)
             encrypted_message += ciphertext[position_plain]
         else:
             encrypted_message += char
