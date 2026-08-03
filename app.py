@@ -1,19 +1,25 @@
-import streamlit as nn  # You can use 'import streamlit as st' 
 import streamlit as st
 
-# Your function works perfectly
-def is_lowercase(char):
-    if 'a' <= char <= 'z':
-        return True
-    else:
-        return False
+alphabet_plain = 'abcdefghijklmnopqrstuvwxyz'
+alphabet_cipher = 'DEFGHIJKLMNOPQRSTUVWXYZABC'
 
-# Streamlit Title
-st.title("Lowercase Checker")
+def caesar_cipher_simple(message):
+    text_cipher = ""
+    
+    for char in message.lower():
+        if char in alphabet:
+            position_plain = alphabet_plain.find(char)
+            text_cipher += alphabet_encrypt[position]
+        else:
+            encrypted_message += char
+            
+    return encrypted_message
 
-# Let users type a character to test it live!
-user_input = st.text_input("Type a single letter:", value="g", max_chars=1)
+# Streamlit Interface
+st.title("Simple Caesar Cipher")
 
-if user_input:
-    result = is_lowercase(user_input)
-    st.write(f"Is '{user_input}' lowercase? **{result}**")
+user_message = st.text_input("Enter text to encrypt:", value="hello")
+
+if user_message:
+    secret_result = caesar_cipher_simple(user_message)
+    st.success(f"Encrypted text: **{secret_result}**")
