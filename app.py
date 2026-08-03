@@ -17,7 +17,7 @@ def caesar_cipher_simple(message):
 
 st.title("Simple Caesar Cipher")
 
-user_message = st.text_input("Enter text to encrypt:", value="hello")
+user_message = st.text_input("Enter text to encrypt:", value="hello world")
 
 if user_message:
     secret_result = caesar_cipher_simple(user_message)
