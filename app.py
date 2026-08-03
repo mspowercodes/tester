@@ -1,19 +1,15 @@
 import streamlit as st
 
-# 1. These are your defined variables
-alphabet_plain = 'abcdefghijklmnopqrstuvwxyz'
-alphabet_cipher = 'DEFGHIJKLMNOPQRSTUVWXYZABC'
+plaintext = 'abcdefghijklmnopqrstuvwxyz'
+ciphertext = 'DEFGHIJKLMNOPQRSTUVWXYZABC'
 
 def caesar_cipher_simple(message):
-    text_cipher = ""
+    encrypted_message = ""
     
     for char in message.lower():
-        # FIXED: Changed 'alphabet' to 'alphabet_plain'
-        if char in alphabet_plain:
-            # FIXED: Changed 'alphabet' to 'alphabet_plain'
-            position_plain = alphabet_plain.find(char)
-            # FIXED: Changed 'alphabet_encrypt[position]' to 'alphabet_cipher[position_plain]'
-            text_cipher += alphabet_cipher[position_plain]
+        if char in plain:
+            position_plain = plaintext.find(char)
+            encrypted_message += ciphertext[position_plain]
         else:
             text_cipher += char
             
