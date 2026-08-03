@@ -1,21 +1,15 @@
-import streamlit as st
-
-def scramble_vowels(message):
-    new_message = ""
+def cryptoclub_ch01(message):
+    plaintext = "abcdefghijklmnopqrstuvwxyz"
+    ciphertext = "DEFGHIJKLMNOPQRSTUVWXYZABC"
+    
+    encrypted_message = []
     
     for char in message:
-        if char == "a":
-            new_message += "@"
-        elif char == "e":
-            new_message += "3"
+        if char in plaintext:
+            number = plaintext.index(char)
+
+            encrypted_message.append(ciphertext[number])
         else:
-            new_message += char
+            encrypted_message.append(char)
             
-    return new_message
-
-st.title("Vowel Scrambler")
-user_text = st.text_input("Type a word:", value="apple")
-
-if user_text:
-    result = scramble_vowels(user_text)
-    st.success(f"Scrambled: {result}")
+    return "".join(encrypted_message)
