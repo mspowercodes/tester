@@ -33,19 +33,18 @@ col_left_panel, col_right_panel = st.columns(2)
 with col_left_panel:
     st.subheader("Input Python Script")
     
-    # 1. Create a mini side-by-side layout inside the left panel
-    # [1] is the narrow column for line numbers, [15] is the wide column for typing
-    col_numbers, col_textarea = st.columns([1, 15])
+    # 1. FIX: Pass weights [1, 25] to make the numbers fit perfectly on the left side
+    col_numbers, col_textarea = st.columns([1, 25])
     
     with col_numbers:
         # Pushes the numbers down slightly so they match up perfectly with line 1 of the typing box
         st.markdown("<div style='height: 43px;'></div>", unsafe_allowed_html=True)
         
         # Build a stationary vertical list of 1 to 15 line numbers
-        # Using monospace ensures the numbers line up nicely with code fonts
-        numbers_layout = ""
+        numbers_layout = "<div style='border-right: 1px solid #444; padding-right: 5px;'>"
         for i in range(1, 16):
             numbers_layout += f"<div style='line-height: 25.5px; font-family: monospace; color: #888; text-align: right;'>{i}</div>"
+        numbers_layout += "</div>"
             
         st.markdown(numbers_layout, unsafe_allowed_html=True)
         
@@ -87,7 +86,7 @@ with col_right_panel:
 
     # --- LIVE INTERACTION ZONE ---
     if st.session_state.detected_functions:
-        target_func_name = st.session_state.detected_functions[0]
+        target_func_name = st.session_state.detected_functions
         target_func = st.session_state.exec_env[target_func_name]
         
         st.success(f"🎉 Active function ready: `{target_func_name}()`")
