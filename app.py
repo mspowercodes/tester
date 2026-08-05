@@ -39,28 +39,28 @@ with col_left:
     guide_lines = [f"{i:2d} |" for i in range(1, max_lines + 1)]
     guide_sidebar = "\n".join(guide_lines)
     
-    # FIXED: Removed the st.form wrapper block entirely to stop the execution freeze
-    col_gutter, col_editor = st.columns([1, 15])  # Explicit weights keep them locked side-by-side
-    
-    with col_gutter:
-        # Displays the line counts right inside the margins
-        st.code(guide_sidebar, language="text")
+    # Render the editor layout side-by-side cleanly within a safe form wrapper
+    with st.form(key="native_editor_form"):
+        # Wrap everything in a two-column setup to enforce a single box look
+        col_gutter, col_editor = st.columns([1, 15])
         
-    with col_editor:
-        # Every keystroke is safely tracked by assigning the key="editor_input"
-        typed_code = st.text_area(
-            label="Code Input:",
-            value=st.session_state.user_code_string,
-            height=215,
-            key="editor_input",
-            label_visibility="collapsed"  # Align directly with row index 1
-        )
+        with col_gutter:
+            # Displays the line counts right inside the margins
+            st.code(guide_sidebar, language="text")
+            
+        with col_editor:
+            typed_code = st.text_area(
+                label="Your Script File Code Input Gutter:",
+                value=st.session_state.user_code_string,
+                height=215,
+                label_visibility="collapsed"  # Align directly with row index 1
+            )
+            
+        # Unified form submission button
+        submit_script_trigger = st.form_submit_button(label="🚀 Run & Compile Code Block")
         
-    # Unified run button that triggers on-the-fly compilation
-    submit_script_trigger = st.button(label="🚀 Run & Compile Code Block", type="primary")
-    
-    if submit_script_trigger:
-        st.session_state.user_code_string = st.session_state.editor_input
+        if submit_script_trigger:
+            st.session_state.user_code_string = typed_code
 
 with col_right:
     st.subheader("🧪 Live Output Testing")
