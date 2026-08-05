@@ -2,7 +2,6 @@ import streamlit as st
 import sys
 import io
 import traceback
-import inspect
 
 st.set_page_config(
     page_title="Single Box Editor Sandbox",
@@ -13,30 +12,27 @@ st.set_page_config(
 st.title("🐍 Single Box Python Editor Sandbox")
 st.markdown("Type code inside the single window below. Line numbers are fully integrated, and code runs instantly without copy-pasting!")
 
-# Default starter code template
+# Default starter code template (now shows a mix of functions and generic execution)
 default_code = """def caesar_shift3(message):
     table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "DEFGHIJKLMNOPQRSTUVWXYZABC")
-    return message.translate(table)"""
+    return message.translate(table)
+
+text = "hello world"
+shifted = caesar_shift3(text)
+
+print(f"Original text: {text}")
+print(f"Shifted output: {shifted}")
+"""
 
 # Persistent memory states
 if "user_code_string" not in st.session_state:
     st.session_state.user_code_string = default_code
-if "exec_env" not in st.session_state:
-    st.session_state.exec_env = {}
-if "detected_functions" not in st.session_state:
-    st.session_state.detected_functions = []
-
-# --- EXTRACT CODE DATA SUBMITTED FROM THE BROWSER ---
-# We use st.query_params to safely capture data sent from our custom HTML box
-query_params = st.query_params
-if "submitted_code" in query_params:
-    st.session_state.user_code_string = query_params["submitted_code"]
 
 col_left, col_right = st.columns(2)
 
 with col_left:
     st.subheader("📝 Integrated Code Box")
-    
+        
     # THE SINGLE-BOX EDITOR ENGINE: Unified code area with auto-compile broadcasting
     custom_editor_html = f"""
     <div style="font-family: monospace; position: relative; border: 1px solid #444; border-radius: 4px; background: #1e1e1e; padding: 0; display: flex; height: 300px;">
@@ -47,7 +43,7 @@ with col_left:
             font-family: inherit; font-size: 14px; line-height: 20px; font-weight: bold;
             border-right: 1px solid #444; user-select: none; pointer-events: none; box-sizing: border-box;
         ">1</textarea>
-        
+                
         <!-- Right Side Typing Editor Area -->
         <textarea id="codeEditor" placeholder="Write your Python script here..." wrap="off" style="
             flex: 1; height: 100%; border: none; background: #1e1e1e; color: #fff; 
@@ -55,7 +51,7 @@ with col_left:
             outline: none; tab-size: 4; box-sizing: border-box; overflow-x: auto;
         ">{st.session_state.user_code_string}</textarea>
     </div>
-    
+        
     <!-- Unified Run Button inside the theme wrapper -->
     <button id="runBtn" style="
         margin-top: 15px; background-color: #ff4b4b; color: white; border: none; 
@@ -84,7 +80,7 @@ with col_left:
         }});
 
         codeEditor.addEventListener('input', updateLines);
-        
+                
         // Handle Tab key indenting natively
         codeEditor.addEventListener('keydown', (e) => {{
             if (e.key === 'Tab') {{
@@ -97,69 +93,57 @@ with col_left:
             }}
         }});
 
-        // Passing text straight to the parent window url queries
+        // Safe component value communication with Streamlit
         runBtn.addEventListener('click', () => {{
-            const codeContent = encodeURIComponent(codeEditor.value);
             window.parent.postMessage({{
                 type: 'streamlit:setComponentValue',
                 value: codeEditor.value
             }}, '*');
-            
-            // Append to parent parameters directly
-            const url = new URL(window.parent.location.href);
-            url.searchParams.set('submitted_code', codeEditor.value);
-            window.parent.location.href = url.href;
         }});
 
         updateLines();
     </script>
     """
-    
-    # Render the native web container component safely
+        
+    # Render the native web container component safely and capture its state return value
     editor_response = st.components.v1.html(custom_editor_html, height=360, scrolling=False)
+    
+    # Catch data returned by the component message value link
+    if editor_response is not None:
+        st.session_state.user_code_string = editor_response
 
 with col_right:
     st.subheader("🧪 Live Output Testing")
-    
+        
     # Process script parameters directly whenever data updates
     if st.session_state.user_code_string:
         output_buffer = io.StringIO()
+        old_stdout = sys.stdout
         sys.stdout = output_buffer
         current_env = {}
         
         try:
+            # Execute whatever script the user typed
             exec(st.session_state.user_code_string, current_env)
             
-            found_funcs = [
-                name for name, obj in current_env.items() 
-                if inspect.isfunction(obj) and not name.startswith('__')
-            ]
+            # Restore standard output system safely
+            sys.stdout = old_stdout
             
-            sys.stdout = sys.__stdout__
-            st.session_state.exec_env = current_env
-            st.session_state.detected_functions = found_funcs
+            # Fetch the captured printed items
+            printed_output = output_buffer.getvalue()
             
+            st.success("🎉 Code executed successfully!")
+            
+            st.write("**Console Output (stdout):**")
+            if printed_output.strip():
+                st.code(printed_output, language="plaintext")
+            else:
+                st.caption("Script completed but did not print any output. Use print() to display results here.")
+                    
         except Exception as e:
-            sys.stdout = sys.__stdout__
+            # Restore standard output system safely during a failure
+            sys.stdout = old_stdout
             st.error("❌ Python Execution Error:")
             st.code(traceback.format_exc(), language="python")
-
-    # --- LIVE TESTING INTERACTION ZONE ---
-    if st.session_state.detected_functions:
-        # FIX: Extract the first single string from the list instead of passing the whole list
-        target_func_name = st.session_state.detected_functions[0]
-        target_func = st.session_state.exec_env[target_func_name]
-        
-        st.success(f"🎉 Active function ready: `{target_func_name}()`")
-        st.write("---")
-        
-        test_input = st.text_input("Enter text to pass into your function:", value="hello world")
-        
-        try:
-            live_result = target_func(test_input)
-            st.write("**Function Output:**")
-            st.info(f"`{live_result}`")
-        except Exception as e:
-            st.error(f"Error running `{target_func_name}`: {e}")
     else:
-        st.caption("Awaiting successful function build from the left panel...")
+        st.caption("Awaiting successful code submission from the left panel...")
