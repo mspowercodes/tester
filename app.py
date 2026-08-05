@@ -24,6 +24,9 @@ with col_left:
 with col_right:
     st.header("2. Test Your Cipher")
     test_message = st.text_input("📩 Enter message to encrypt:", value="hello world")
+    
+    # The Run Button to trigger execution on demand
+    run_clicked = st.button("🚀 Run Cipher", type="primary")
 
 # Escaping backslashes and quotes to make the code string safe for JavaScript insertion
 safe_code = raw_code_input.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
@@ -55,6 +58,7 @@ python_payload = (
 )
 
 # 4. The HTML Container that hosts Pyodide
+# We pass an extra variable 'shouldRun' into JS to control execution
 html_code = f"""
 <!DOCTYPE html>
 <html>
@@ -67,11 +71,18 @@ html_code = f"""
     </style>
 </head>
 <body>
-    <div class="status" id="status">⏳ Loading Python environment in browser...</div>
+    <div class="status" id="status">💤 Waiting for you to click 'Run Cipher'...</div>
     <div id="output-box">Your encrypted message will appear here...</div>
 
     <script>
         async function main() {{
+            const shouldRun = {str(run_clicked).lower()};
+            
+            if (!shouldRun) {{
+                return;
+            }}
+
+            document.getElementById('status').innerText = "⏳ Loading Python environment in browser...";
             let pyodide = await loadPyodide();
             document.getElementById('status').innerText = "✅ Python Engine Ready! Running your code...";
             
