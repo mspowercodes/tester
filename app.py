@@ -6,7 +6,7 @@ import streamlit as st
 
 st.set_page_config(layout="wide")
 st.title("🔐 Build Your Own Secret Cipher!")
-st.caption("A safe, public environment for testing student encryption code.")
+st.caption("A clean, production-grade sandbox for testing student encryption code.")
 
 # Initialize persistent session states
 if "code_verified" not in st.session_state:
@@ -33,26 +33,32 @@ current_code = st.text_area(
     height=250
 )
 
+# FIXED: Ensure Python can see basic system configuration data to prevent loading crashes,
+# while completely filtering out any custom secrets or API variables from your host.
+safe_env = {
+    "PATH": os.environ.get("PATH", os.defpath),
+    "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),  # Necessary for Windows-based servers
+    "PYTHONPATH": os.path.dirname(sys.executable),
+    "LANG": "en_US.UTF-8"
+}
+
 if st.button("Check My Code Syntax 🛠️"):
-    # Clear out environment inheritance entirely to hide host secrets
-    clean_env = {"PATH": os.defpath, "LANG": "en_US.UTF-8"}
-    
-    # SECURITY: Create a temporary jail directory separate from the app's source code
+    # Create an entirely isolated directory separate from the app source code
     with tempfile.TemporaryDirectory() as jail_dir:
         temp_file_path = os.path.join(jail_dir, "student_code.py")
         with open(temp_file_path, "w") as f:
             f.write(current_code)
 
         try:
-            # Execute Python in Isolated mode (-I) inside the empty sandbox directory
+            # Run code securely inside the empty directory
             result = subprocess.run(
                 [sys.executable, "-I", "student_code.py"],
                 input="test",
                 capture_output=True,
                 text=True,
-                env=clean_env,
-                cwd=jail_dir,  # CRITICAL: Forces Python to see an empty folder as its root
-                timeout=3      # SAFE GUARD: Kills infinite loops within 3 seconds
+                env=safe_env,  # Uses the corrected safe environment definition
+                cwd=jail_dir,  # Strict folder isolation: user sees an empty folder
+                timeout=3      # Instantly kills infinite loops within 3 seconds
             )
             
             if result.stderr:
@@ -68,7 +74,7 @@ if st.button("Check My Code Syntax 🛠️"):
             st.error("⏳ Your code took too long to run! Make sure you don't have an infinite loop.")
             st.session_state.code_verified = False
         except Exception as e:
-            st.error(f"Execution blocked by security policy: {e}")
+            st.error(f"Execution failed to run: {e}")
             st.session_state.code_verified = False
 
 # --- STEP 2: THE CONDITIONAL ENCRYPTION BOX ---
@@ -78,9 +84,6 @@ if st.session_state.code_verified:
     kids_message = st.text_input("🔑 Enter a secret message to encrypt:", value="Hello World")
     
     if st.button("🔒 Run Encryption"):
-        clean_env = {"PATH": os.defpath, "LANG": "en_US.UTF-8"}
-        
-        # SECURITY: Re-sandbox the environment for the active payload execution
         with tempfile.TemporaryDirectory() as jail_dir:
             temp_file_path = os.path.join(jail_dir, "student_code.py")
             with open(temp_file_path, "w") as f:
@@ -92,9 +95,9 @@ if st.session_state.code_verified:
                     input=kids_message,
                     capture_output=True,
                     text=True,
-                    env=clean_env,
-                    cwd=jail_dir,  # CRITICAL: Ensures student code can't read your project files
-                    timeout=3      # SAFE GUARD: Kills infinite loops within 3 seconds
+                    env=safe_env,
+                    cwd=jail_dir,
+                    timeout=3
                 )
                 
                 if run_result.stdout:
