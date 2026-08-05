@@ -35,6 +35,9 @@ with col_left:
         
     # THE SINGLE-BOX EDITOR ENGINE: Unified code area with auto-compile broadcasting
     custom_editor_html = f"""
+    <!-- Load Streamlit Component Library API connection asset -->
+    <script src="https://jsdelivr.net"></script>
+
     <div style="font-family: monospace; position: relative; border: 1px solid #444; border-radius: 4px; background: #1e1e1e; padding: 0; display: flex; height: 300px;">
         <!-- Left Side Gutter Line Numbers -->
         <textarea id="lineCounter" readonly style="
@@ -93,37 +96,28 @@ with col_left:
             }}
         }});
 
-        // Safe component value communication with Streamlit
+        // Component API handshake activation
+        Streamlit.setFrameHeight(360);
+
+        // Safe component value communication using the library API 
         runBtn.addEventListener('click', () => {{
-            window.parent.postMessage({{
-                type: 'streamlit:setComponentValue',
-                value: codeEditor.value
-            }}, '*');
+            Streamlit.setComponentValue(codeEditor.value);
         }});
 
         updateLines();
     </script>
     """
         
-    # Render the native web container component safely
-    editor_response = st.components.v1.html(custom_editor_html, height=360, scrolling=False)
+    # Render the native web container component using a persistent key to prevent reload loops
+    editor_response = st.components.v1.html(custom_editor_html, height=360, scrolling=False, key="editor_sandbox_instance")
     
-    # FIXED: Extract data safely and trigger a rerun if a new value arrives
-    if editor_response is not None:
-        # Check if the internal value contains a string element from the frame
-        if hasattr(editor_response, 'value'):
-            new_code = editor_response.value
-        else:
-            new_code = str(editor_response)
-            
-        if new_code != st.session_state.user_code_string:
-            st.session_state.user_code_string = new_code
-            st.rerun()
+    # Safely extract component returns and save directly into state without loops
+    if editor_response is not None and editor_response != st.session_state.user_code_string:
+        st.session_state.user_code_string = editor_response
 
 with col_right:
     st.subheader("🧪 Live Output Testing")
         
-    # Process script parameters directly whenever data updates
     if st.session_state.user_code_string:
         output_buffer = io.StringIO()
         old_stdout = sys.stdout
@@ -131,25 +125,21 @@ with col_right:
         current_env = {}
         
         try:
-            # Safely cast string type for exec requirement
+            # Execute user script directly 
             exec(str(st.session_state.user_code_string), current_env)
             
-            # Restore standard output system safely
             sys.stdout = old_stdout
-            
-            # Fetch the captured printed items
             printed_output = output_buffer.getvalue()
             
             st.success("🎉 Code executed successfully!")
-            
             st.write("**Console Output (stdout):**")
+            
             if printed_output.strip():
                 st.code(printed_output, language="plaintext")
             else:
                 st.caption("Script completed but did not print any output. Use print() to display results here.")
                     
         except Exception as e:
-            # Restore standard output system safely during a failure
             sys.stdout = old_stdout
             st.error("❌ Python Execution Error:")
             st.code(traceback.format_exc(), language="python")
