@@ -1,10 +1,9 @@
-import io
-import contextlib
+import ast
 import streamlit as st
 
 st.set_page_config(layout="wide")
 st.title("🔐 Build Your Own Secret Cipher!")
-st.caption("A completely fail-safe sandbox environment for testing student encryption code.")
+st.caption("An instantly loading, cloud-safe sandbox for testing student encryption functions.")
 
 # Initialize persistent session states
 if "code_verified" not in st.session_state:
@@ -14,69 +13,70 @@ if "saved_code" not in st.session_state:
 
 # --- STEP 1: THE CODE EDITOR ---
 st.header("1. Write Your Python Cipher")
-st.markdown("Your script must read a message using `input()` and print out the scrambled result.")
+st.markdown(
+    "Define a function named `encrypt` that takes a text `message` string "
+    "and **returns** the scrambled result. Use the example below as a guide:"
+)
 
 default_code = (
-    '# Simple Caesar Cipher (shifts letters by 1)\n'
-    'secret_message = input()\n'
-    'encrypted = ""\n\n'
-    'for letter in secret_message:\n'
-    '    encrypted += chr(ord(letter) + 1)\n\n'
-    'print(encrypted)'
+    'def encrypt(message):\n'
+    '    output = ""\n'
+    '    for letter in message:\n'
+    '        # Shift the character up by 1 position\n'
+    '        output += chr(ord(letter) + 1)\n'
+    '    return output'
 )
 
 current_code = st.text_area(
     "💻 Python Editor:", 
     value=st.session_state.saved_code if st.session_state.saved_code else default_code, 
-    height=250
+    height=200
 )
 
-# Custom secure function simulation replacing standard terminal inputs
-def run_student_code(code_string, user_input_data):
-    """Safely parses and isolates code execution without using files or subprocesses."""
-    # Mocking terminal functions to create an absolute sandbox boundary
-    def mocked_input():
-        return str(user_input_data)
-
-    # Restricted local scope: Completely locks out system files, variables, and modules
-    safe_globals = {
-        "__builtins__": {
-            "print": print,
-            "input": mocked_input, # Seamlessly overrides user input with our text block!
-            "str": str,
-            "int": int,
-            "chr": chr,
-            "ord": ord,
-            "len": len,
-            "range": range,
-            "list": list,
-        }
-    }
-    
-    output_buffer = io.StringIO()
-    
+def run_safe_cipher(code_string, test_message):
+    """Parses and executes the student function safely using isolated AST trees."""
     try:
-        # Step A: Compile the raw string into byte-code to verify syntax errors instantly
-        compiled_bytecode = compile(code_string, "student_cipher.py", "exec")
+        # Step A: Parse the string code into a safe Abstract Syntax Tree
+        parsed_tree = ast.parse(code_string, filename="student_cipher.py")
         
-        # Step B: Execute the isolated bytecode inside our safe, limited variable container
-        with contextlib.redirect_stdout(output_buffer):
-            exec(compiled_bytecode, safe_globals, {})
+        # Step B: Scan tree to ensure they aren't importing dangerous system modules
+        for node in ast.walk(parsed_tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                return None, "Importing external modules is disabled for safety!"
+
+        # Step C: Compile the verified tree structural logic
+        compiled_code = compile(parsed_tree, filename="student_cipher.py", mode="exec")
+        
+        # Step D: Execute strictly within an isolated variables sandbox 
+        # (Completely blocks access to 'os', file writing, or parent script memory)
+        isolated_scope = {
+            "chr": chr, "ord": ord, "len": len, "range": range, "str": str, "int": int
+        }
+        exec(compiled_code, {"__builtins__": isolated_scope}, isolated_scope)
+        
+        # Step E: Make sure they actually created the 'encrypt' function
+        if "encrypt" not in isolated_scope or not callable(isolated_scope["encrypt"]):
+            return None, "You must define a function named 'encrypt(message)'."
             
-        return output_buffer.getvalue(), None
-    except Exception as e:
-        return None, str(e)
+        # Run their function cleanly and capture the standard return value
+        encrypted_result = isolated_scope["encrypt"](test_message)
+        return str(encrypted_result), None
+
+    except SyntaxError as syntax_err:
+        return None, f"Syntax Error on line {syntax_err.lineno}: {syntax_err.msg}"
+    except Exception as run_err:
+        return None, f"Runtime Error: {run_err}"
 
 if st.button("Check My Code Syntax 🛠️"):
-    # Test execution instantly using a basic word
-    output, error = run_student_code(current_code, "test")
+    # Run an instant structural verification test
+    output, error = run_safe_cipher(current_code, "test")
     
     if error:
-        st.error("❌ Uh oh! There is an error in your code structure:")
+        st.error("❌ Uh oh! There is an issue with your function script:")
         st.error(error)
         st.session_state.code_verified = False
     else:
-        st.success("✅ Awesome! Your script compiled successfully. Look below to type your message!")
+        st.success("✅ Awesome! Your function compiled successfully. Look below to type your message!")
         st.session_state.code_verified = True
         st.session_state.saved_code = current_code
 
@@ -87,12 +87,12 @@ if st.session_state.code_verified:
     kids_message = st.text_input("🔑 Enter a secret message to encrypt:", value="Hello World")
     
     if st.button("🔒 Run Encryption"):
-        output, error = run_student_code(st.session_state.saved_code, kids_message)
+        output, error = run_safe_cipher(st.session_state.saved_code, kids_message)
         
-        if output:
+        if output is not None:
             st.subheader("🎉 Your Encrypted Secret Message:")
             st.info(output)
             
         if error:
-            st.error("⚠️ The code broke while trying to scramble this message:")
+            st.error("⚠️ The encryption broken trying to scramble this message:")
             st.error(error)
