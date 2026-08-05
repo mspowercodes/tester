@@ -25,20 +25,44 @@ with col_right:
     st.header("2. Test Your Cipher")
     test_message = st.text_input("📩 Enter message to encrypt:", value="hello world")
 
-# Escaping backslashes and quotes for the HTML injection safely
+# Escaping backslashes and quotes to make the code string safe for JavaScript insertion
 safe_code = raw_code_input.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
 safe_message = test_message.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
 
-# 3. The Pyodide Sandbox (Runs completely in the user's browser)
+# 3. Pure Python block for the browser (Separated to avoid f-string NameErrors on the server)
+python_payload = (
+    "import ast\n"
+    "def run_secure():\n"
+    f"    student_code = r\"\"\"{safe_code}\"\"\"\n"
+    f"    test_msg = \"\"\"{safe_message}\"\"\"\n"
+    "    try:\n"
+    "        parsed_ast = ast.parse(student_code)\n"
+    "        found_function_name = None\n"
+    "        for node in parsed_ast.body:\n"
+    "            if isinstance(node, ast.FunctionDef):\n"
+    "                found_function_name = node.name\n"
+    "                break\n"
+    "        if not found_function_name:\n"
+    "            return '❌ Error: Could not find any function definition (def your_function).'\n"
+    "        local_scope = {}\n"
+    "        exec(student_code, {}, local_scope)\n"
+    "        cipher_func = local_scope[found_function_name]\n"
+    "        result = cipher_func(test_msg)\n"
+    "        return '🔒 Encrypted Output (' + str(found_function_name) + '):\\n' + str(result)\n"
+    "    except Exception as e:\n"
+    "        return '❌ Python Runtime Error:\\n' + str(e)\n"
+    "print(run_secure())"
+)
+
+# 4. The HTML Container that hosts Pyodide
 html_code = f"""
 <!DOCTYPE html>
 <html>
 <head>
-    <!-- Load Pyodide from a secure public CDN -->
     <script src="https://jsdelivr.net"></script>
     <style>
         body {{ font-family: sans-serif; background-color: #f9f9f9; color: #333; margin: 10px; }}
-        #output-box {{ padding: 15px; border-radius: 8px; background: #ffffff; border: 1px solid #ddd; min-height: 50px; font-family: monospace; white-space: pre-wrap; }}
+        #output-box {{ padding: 15px; border-radius: 8px; background: #ffffff; border: 1px solid #ddd; min-height: 60px; font-family: monospace; white-space: pre-wrap; }}
         .status {{ font-size: 0.9em; color: #666; margin-bottom: 8px; }}
     </style>
 </head>
@@ -48,48 +72,17 @@ html_code = f"""
 
     <script>
         async function main() {{
-            // 1. Initialize Pyodide
             let pyodide = await loadPyodide();
             document.getElementById('status').innerText = "✅ Python Engine Ready! Running your code...";
             
-            // 2. Define the Python wrapper to safely parse, find, and run the student's function
-            let pythonWrapper = `
-import ast
+            // Capture standard output from the Python execution
+            pyodide.setStdout({{ batched: (text) => {{
+                document.getElementById('output-box').innerText = text;
+            }}}});
 
-def run_secure():
-    student_code = \"\"\"{safe_code}\"\"\"
-    test_msg = \"\"\"{safe_message}\"\"\"
-    
-    try:
-        # Parse the code to automatically find the function name
-        parsed_ast = ast.parse(student_code)
-        found_function_name = None
-        for node in parsed_ast.body:
-            if isinstance(node, ast.FunctionDef):
-                found_function_name = node.name
-                break
-                
-        if not found_function_name:
-            return "❌ Error: Could not find any function definition (def your_function)."
-            
-        # Execute the user's code block safely in a local dict
-        local_scope = {{}}
-        exec(student_code, {{}}, local_scope)
-        
-        # Grab and run the function
-        cipher_func = local_scope[found_function_name]
-        result = cipher_func(test_msg)
-        return f"🔒 Encrypted Output ({found_function_name}):\\n{{result}}"
-        
-    except Exception as e:
-        return f"❌ Python Runtime Error:\\n{{str(e)}}"
-
-run_secure()
-`;
             try {{
-                // 3. Execute the wrapper and display results
-                let result = await pyodide.runPythonAsync(pythonWrapper);
-                document.getElementById('output-box').innerText = result;
+                // Run the compiled payload block completely locally
+                await pyodide.runPythonAsync(`{python_payload}`);
                 document.getElementById('status').innerText = "🏁 Execution finished successfully.";
             }} catch (err) {{
                 document.getElementById('output-box').innerText = "❌ Fatal execution error: " + err.message;
@@ -102,7 +95,7 @@ run_secure()
 </html>
 """
 
-# Render the safe HTML container inside Streamlit
+# Render the container
 with col_right:
     st.subheader("3. Execution Results")
     components.html(html_code, height=250)
