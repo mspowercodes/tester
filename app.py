@@ -12,7 +12,7 @@ st.set_page_config(
 st.title("🐍 Single Box Python Editor Sandbox")
 st.markdown("Type code inside the single window below. Line numbers are fully integrated, and code runs instantly without copy-pasting!")
 
-# Default starter code template (now shows a mix of functions and generic execution)
+# Default starter code template
 default_code = """def caesar_shift3(message):
     table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "DEFGHIJKLMNOPQRSTUVWXYZABC")
     return message.translate(table)
@@ -105,12 +105,20 @@ with col_left:
     </script>
     """
         
-    # Render the native web container component safely and capture its state return value
+    # Render the native web container component safely
     editor_response = st.components.v1.html(custom_editor_html, height=360, scrolling=False)
     
-    # Catch data returned by the component message value link
+    # FIXED: Extract data safely and trigger a rerun if a new value arrives
     if editor_response is not None:
-        st.session_state.user_code_string = editor_response
+        # Check if the internal value contains a string element from the frame
+        if hasattr(editor_response, 'value'):
+            new_code = editor_response.value
+        else:
+            new_code = str(editor_response)
+            
+        if new_code != st.session_state.user_code_string:
+            st.session_state.user_code_string = new_code
+            st.rerun()
 
 with col_right:
     st.subheader("🧪 Live Output Testing")
@@ -123,8 +131,8 @@ with col_right:
         current_env = {}
         
         try:
-            # Execute whatever script the user typed
-            exec(st.session_state.user_code_string, current_env)
+            # Safely cast string type for exec requirement
+            exec(str(st.session_state.user_code_string), current_env)
             
             # Restore standard output system safely
             sys.stdout = old_stdout
