@@ -11,14 +11,14 @@ st.set_page_config(
 )
 
 st.title("🐍 Single Box Python Editor Sandbox")
-st.markdown("Type code inside the single window below. Line numbers and editor margins are fully integrated!")
+st.markdown("Type code inside the single window below. Line numbers are fully integrated, and code runs instantly without copy-pasting!")
 
-# Default template code
+# Default starter code template
 default_code = """def caesar_shift3(message):
     table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "DEFGHIJKLMNOPQRSTUVWXYZABC")
     return message.translate(table)"""
 
-# Persistent memory state tracks the user's current code string
+# Persistent memory states
 if "user_code_string" not in st.session_state:
     st.session_state.user_code_string = default_code
 if "exec_env" not in st.session_state:
@@ -26,12 +26,18 @@ if "exec_env" not in st.session_state:
 if "detected_functions" not in st.session_state:
     st.session_state.detected_functions = []
 
+# --- EXTRACT CODE DATA SUBMITTED FROM THE BROWSER ---
+# We use st.query_params to safely capture data sent from our custom HTML box
+query_params = st.query_params
+if "submitted_code" in query_params:
+    st.session_state.user_code_string = query_params["submitted_code"]
+
 col_left, col_right = st.columns(2)
 
 with col_left:
     st.subheader("📝 Integrated Code Box")
     
-    # 1. THE SINGLE-BOX EDITOR ENGINE: Pure browser JavaScript handles the text & lines inside ONE element
+    # 1. THE SINGLE-BOX EDITOR ENGINE: Unified code area with auto-compile broadcasting
     custom_editor_html = f"""
     <div style="font-family: monospace; position: relative; border: 1px solid #444; border-radius: 4px; background: #1e1e1e; padding: 0; display: flex; height: 300px;">
         <!-- Left Side Gutter Line Numbers -->
@@ -49,10 +55,17 @@ with col_left:
             outline: none; tab-size: 4; box-sizing: border-box; overflow-x: auto;
         ">{st.session_state.user_code_string}</textarea>
     </div>
+    
+    <!-- Unified Run Button inside the theme wrapper -->
+    <button id="runBtn" style="
+        margin-top: 15px; background-color: #ff4b4b; color: white; border: none; 
+        padding: 8px 16px; font-size: 14px; border-radius: 4px; cursor: pointer; font-family: sans-serif;
+    ">🚀 Run & Compile Code</button>
 
     <script>
         const codeEditor = document.getElementById('codeEditor');
         const lineCounter = document.getElementById('lineCounter');
+        const runBtn = document.getElementById('runBtn');
 
         function updateLines() {{
             const lines = codeEditor.value.split('\\n');
@@ -70,10 +83,9 @@ with col_left:
             lineCounter.scrollTop = codeEditor.scrollTop;
         }});
 
-        // Dynamic key stroke listeners
         codeEditor.addEventListener('input', updateLines);
         
-        // Handle Tab key indenting instead of losing focus
+        // Handle Tab key indenting natively
         codeEditor.addEventListener('keydown', (e) => {{
             if (e.key === 'Tab') {{
                 e.preventDefault();
@@ -85,29 +97,34 @@ with col_left:
             }}
         }});
 
-        // Trigger on initial page load
+        # THE AUTOMATED BRIDGE FIX: Passing text straight to the parent window url queries
+        runBtn.addEventListener('click', () => {{
+            const codeContent = encodeURIComponent(codeEditor.value);
+            // This updates the top level parent URL params, triggering an instant Streamlit reload with the data
+            window.parent.postMessage({{
+                type: 'streamlit:setComponentValue',
+                value: codeEditor.value
+            }}, '*');
+            
+            // Fallback for secure iframe clouds: append to parent parameters directly
+            const url = new URL(window.parent.location.href);
+            url.searchParams.set('submitted_code', codeEditor.value);
+            window.parent.location.href = url.href;
+        }});
+
         updateLines();
     </script>
     """
     
     # Render the native web container component safely
-    st.components.v1.html(custom_editor_html, height=310, scrolling=False)
-    
-    # 2. STANDARD BINDING TEXT INPUT: Since raw HTML scripts are isolated, users paste final scripts below to run
-    user_script_input = st.text_area(
-        label="Copy-paste code modifications here to trigger compilation:", 
-        value=st.session_state.user_code_string,
-        height=100
-    )
-    
-    run_button = st.button("🚀 Run & Test Code Block")
-    if run_button:
-        st.session_state.user_code_string = user_script_input
+    # We catch the returned data output natively directly from the object call wrapper
+    editor_response = st.components.v1.html(custom_editor_html, height=360, scrolling=False)
 
 with col_right:
     st.subheader("🧪 Live Output Testing")
     
-    if run_button and st.session_state.user_code_string:
+    # Process script parameters directly whenever data updates
+    if st.session_state.user_code_string:
         output_buffer = io.StringIO()
         sys.stdout = output_buffer
         current_env = {}
