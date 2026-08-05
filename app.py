@@ -5,28 +5,22 @@ import traceback
 import ast
 
 st.set_page_config(
-    page_title="Interactive Python Executor",
-    page_icon="🐍",
+    page_title="Auto-Print Python Executor",
+    page_icon="🤖",
     layout="wide"
 )
 
-st.title("🐍 Interactive Python Script Runner")
-st.markdown("Type your Python code below and click **Run Script** to see the output.")
+st.title("🤖 Auto-Print Python Script Runner")
+st.markdown("Type your code below. The final calculation or variable will display automatically without typing `print()`.")
 
-# Default starter code that demonstrates both printing and expressions
-default_code = """# Option 1: Use print statements
-print("Hello from Streamlit Cloud!")
+# Default starter code showing that raw calculations display instantly
+default_code = """# Define variables or functions normally
+subtotal = 50
+tax_rate = 0.08
+total_cost = subtotal * (1 + tax_rate)
 
-# Option 2: Write a function and call it
-def add_numbers(a, b):
-    return a + b
-
-result = add_numbers(10, 5)
-print(f"The result is: {result}")
-
-# Option 3: Just type a raw value or calculation on the final line
-2 + 2
-"""
+# Just type the variable or calculation on the last line to see it!
+total_cost"""
 
 col1, col2 = st.columns(2)
 
@@ -41,56 +35,58 @@ with col1:
         submit_button = st.form_submit_button(label="▶ Run Script")
 
 with col2:
-    st.subheader("Console Output")
+    st.subheader("Output")
     
     if submit_button:
-        # 1. Setup execution environment and console redirect
+        # Clear/setup standard text buffer for any standard print statements used
         output_buffer = io.StringIO()
         sys.stdout = output_buffer
+        
+        # Persistent global environment for this specific run
         exec_globals = {}
         
         try:
-            # 2. Advanced Parsing: Separate the code body from the final line
-            # This allows us to capture raw expressions (like "2+2") if there are no print statements
+            # 1. Parse the user's code into an Abstract Syntax Tree (AST)
             cleaned_code = user_code.strip()
-            lines = cleaned_code.split('\n')
+            tree = ast.parse(cleaned_code)
             
-            if lines:
-                body = '\n'.join(lines[:-1])
-                last_line = lines[-1]
+            # 2. Check if the very last line of code is a raw expression (like a variable or math)
+            if tree.body and isinstance(tree.body[-1], ast.Expr):
+                # Isolate the final line expression
+                last_expr = tree.body.pop()
                 
-                # Execute everything except the last line first
-                if body:
-                    exec(body, exec_globals)
+                # Compile and execute all lines leading up to the final expression
+                if tree.body:
+                    exec(compile(tree, filename="<ast>", mode="exec"), exec_globals)
                 
-                # Try to evaluate the last line as an expression to return a value
-                try:
-                    compiled_last = compile(last_line, '<string>', 'eval')
-                    eval_result = eval(compiled_last, exec_globals)
-                    # If it successfully evaluated and wasn't None, print it to the buffer
-                    if eval_result is not None:
-                        print(eval_result)
-                except Exception:
-                    # If the last line is a statement (like a loop or assignment), execute it normally
-                    exec(last_line, exec_globals)
+                # Compile and explicitly evaluate the final line to extract its value
+                expr_mode = ast.Expression(last_expr.value)
+                final_result = eval(compile(expr_mode, filename="<ast>", mode="eval"), exec_globals)
             else:
-                exec(user_code, exec_globals)
-                
-            # 3. Reset console output back to system defaults
+                # If the last line is a statement (like a loop or function definition), execute normally
+                exec(compile(tree, filename="<ast>", mode="exec"), exec_globals)
+                final_result = None
+            
+            # 3. Restore standard system console output
             sys.stdout = sys.__stdout__
-            captured_output = output_buffer.getvalue()
+            captured_printed_output = output_buffer.getvalue()
             
-            # 4. Display the gathered output to the user
-            if captured_output.strip():
-                st.code(captured_output, language="text")
-            else:
-                st.warning("⚠️ Script ran fine, but generated no output text. Make sure to use print() or put an expression on the final line!")
+            # 4. Display results to user
+            # Show standard prints if they exist
+            if captured_printed_output.strip():
+                st.code(captured_printed_output, language="text")
+            
+            # Automatically show the final un-printed evaluation result
+            if final_result is not None:
+                st.metric(label="Evaluated Result:", value=str(final_result))
+            elif not captured_printed_output.strip():
+                st.info("Script executed successfully, but returned no value.")
                 
         except Exception as e:
-            # Safety catch: Always restore stdout if the user's code crashes
+            # Emergency safety reset for system console
             sys.stdout = sys.__stdout__
             error_msg = traceback.format_exc()
-            st.error("❌ An error occurred during execution:")
+            st.error("❌ Execution Error:")
             st.code(error_msg, language="python")
     else:
         st.caption("Waiting for script execution...")
