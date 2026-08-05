@@ -1,126 +1,109 @@
 import streamlit as st
+import subprocess
+import tempfile
 import sys
-import io
-import traceback
-import inspect
+import psutil
+import platform
 
+# 1. Page Configuration
 st.set_page_config(
-    page_title="Streamlit Python Sandbox",
-    page_icon="🐍",
+    page_title="Secure Python Runner",
+    page_icon="🛡️",
     layout="wide"
 )
 
-st.title("🐍 Native Python Editor Sandbox")
-st.markdown("Type any Python code or function on the left, then click the button to execute it and run live tests on the right panel.")
+# 2. Sidebar Layout - Environment Info & Limits
+with st.sidebar:
+    st.header("⚙️ Runner Configuration")
+    
+    # Execution Time Safety Limit
+    timeout_limit = st.slider(
+        "Maximum Execution Time (Seconds)", 
+        min_value=1, 
+        max_value=30, 
+        value=5,
+        help="Forces code to stop if it gets stuck in an infinite loop."
+    )
+    
+    st.divider()
+    st.subheader("🖥️ Host System Info")
+    st.text(f"OS: {platform.system()} ({platform.release()})")
+    st.text(f"Python Ver: {platform.python_version()}")
+    
+    # Live CPU / Memory usage tracking
+    cpu_use = psutil.cpu_percent()
+    mem_use = psutil.virtual_memory().percent
+    st.progress(cpu_use / 100, text=f"Host CPU Usage: {cpu_use}%")
+    st.progress(mem_use / 100, text=f"Host RAM Usage: {mem_use}%")
 
-# Default starting code template
-default_code = """def caesar_shift3(message):
-    table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "DEFGHIJKLMNOPQRSTUVWXYZABC")
-    return message.translate(table)
+# 3. Main Dashboard Layout
+st.title("🛡️ Secure Python Subprocess Runner")
+st.caption("Runs code inside an isolated standalone process. State is wiped clean on every run.")
 
-# You can also run plain expressions or prints here:
-print("Code template compiled successfully!")
+col1, col2 = st.columns([3, 2])
+
+with col1:
+    st.subheader("📝 Python Script Input")
+    
+    # Baseline instructional code pattern
+    starter_code = """# Subprocess example script
+import sys
+import time
+
+print("Hello from the subprocess environment!")
+print(f"Running via interpreter: {sys.executable}")
+
+# Let's count some numbers
+squares = [x**2 for x in range(1, 6)]
+print(f"Calculated squares: {squares}")
 """
+    
+    user_code = st.text_area(
+        label="Code Input Box",
+        value=starter_code,
+        height=450,
+        label_visibility="collapsed"
+    )
+    
+    run_btn = st.button("▶ Run Script", type="primary", use_container_width=True)
 
-# Track application state across clicks
-if "user_code" not in st.session_state:
-    st.session_state.user_code = default_code
-if "has_run" not in st.session_state:
-    st.session_state.has_run = False
-
-col_editor, col_output = st.columns(2)
-
-with col_editor:
-    st.subheader("📝 Integrated Code Box")
+with col2:
+    st.subheader("🖥️ Execution Output console")
     
-    # Calculate how many lines are currently in the code template
-    num_lines = len(st.session_state.user_code.split("\n"))
-    line_numbers_string = "\n".join(str(i) for i in range(1, num_lines + 1))
-    
-    # Visual Layout: Align line numbers directly next to the code text area
-    gutter, textarea = st.columns([1, 15])
-    
-    with gutter:
-        # Static tracking box displaying line integers cleanly
-        st.text_area(
-            label="Lines",
-            value=line_numbers_string,
-            height=300,
-            disabled=True,
-            label_visibility="collapsed"
-        )
-        
-    with textarea:
-        # Main input editor window where the user types
-        code_input = st.text_area(
-            label="Python Code Editor Input",
-            value=st.session_state.user_code,
-            height=300,
-            label_visibility="collapsed"
-        )
-    
-    # Trigger execution update
-    if st.button("🚀 Run & Compile Code", type="primary"):
-        st.session_state.user_code = code_input
-        st.session_state.has_run = True
-        st.rerun()
-
-with col_output:
-    st.subheader("🧪 Live Output Testing")
-    
-    if st.session_state.has_run:
-        output_buffer = io.StringIO()
-        old_stdout = sys.stdout
-        sys.stdout = output_buffer
-        current_env = {}
-        
-        try:
-            # Safely compile whatever functions or statements the user provided
-            exec(st.session_state.user_code, current_env)
+    if run_btn:
+        # Create a temporary secure script file on the server file system
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w", encoding="utf-8") as temp_file:
+            temp_file.write(user_code)
+            temp_file_path = temp_file.name
             
-            # Restore stdout standard stream mapping
-            sys.stdout = old_stdout
-            printed_logs = output_buffer.getvalue()
-            
-            st.success("🎉 Code compiled successfully!")
-            
-            # Display print logs if present
-            if printed_logs.strip():
-                st.write("**Console Output (stdout):**")
-                st.code(printed_logs, language="plaintext")
-            
-            # Look for executable user-defined functions inside the environment
-            found_functions = [
-                name for name, obj in current_env.items()
-                if inspect.isfunction(obj) and not name.startswith('__')
-            ]
-            
-            if found_functions:
-                st.write("---")
-                st.markdown("### 📥 Interactive Function Tester")
+        with st.spinner("Executing script..."):
+            try:
+                # Capture terminal processes safely using sys.executable
+                # This ensures the script utilizes the exact same python packages as Streamlit
+                process_result = subprocess.run(
+                    [sys.executable, temp_file_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_limit
+                )
                 
-                # Pick the primary custom function found
-                target_name = found_functions[0]
-                target_func = current_env[target_name]
+                # Render Console Standard Prints (STDOUT)
+                if process_result.stdout:
+                    st.success("Execution Output:")
+                    st.code(process_result.stdout, language="text")
                 
-                st.caption(f"Testing active function: `{target_name}()`")
-                
-                # Dynamic text area generated right here for entering arguments
-                test_message = st.text_input("Enter text to pass as a message argument:", value="hello world")
-                
-                if test_message:
-                    try:
-                        # Feed the live text input directly into the user's function
-                        result = target_func(test_message)
-                        st.markdown("**Function Result Output:**")
-                        st.info(f"`{result}`")
-                    except Exception as func_err:
-                        st.error(f"Execution error inside `{target_name}`: {func_err}")
-                        
-        except Exception as e:
-            # Revert stream output safely during a compilation failure
-            sys.stdout = old_stdout
-            st.error("❌ Python Execution/Syntax Error:")
-            st.code(traceback.format_exc(), language="python")
+                # Render Failures/Tracebacks cleanly (STDERR)
+                if process_result.stderr:
+                    st.error("Runtime Error or Traceback Raised:")
+                    st.code(process_result.stderr, language="python")
+                    
+                if not process_result.stdout and not process_result.stderr:
+                    st.info("Script executed successfully but generated no console outputs.")
+                    
+            except subprocess.TimeoutExpired:
+                st.error(f"🚨 Execution Halted! Script exceeded your {timeout_limit} second time limit.")
+                st.warning("Ensure your script does not contain unresolved `while True:` loops or stuck user inputs.")
+            except Exception as system_err:
+                st.error(f"Internal runner failure: {str(system_err)}")
     else:
-        st.caption("Awaiting successful code execution from the left panel...")
+        st.info("Write your Python script and click 'Run Script' to execute.")
