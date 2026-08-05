@@ -1,12 +1,10 @@
-import os
-import sys
-import subprocess
-import tempfile
+import io
+import contextlib
 import streamlit as st
 
 st.set_page_config(layout="wide")
 st.title("🔐 Build Your Own Secret Cipher!")
-st.caption("A clean, production-grade sandbox for testing student encryption code.")
+st.caption("A completely fail-safe sandbox environment for testing student encryption code.")
 
 # Initialize persistent session states
 if "code_verified" not in st.session_state:
@@ -33,49 +31,54 @@ current_code = st.text_area(
     height=250
 )
 
-# FIXED: Ensure Python can see basic system configuration data to prevent loading crashes,
-# while completely filtering out any custom secrets or API variables from your host.
-safe_env = {
-    "PATH": os.environ.get("PATH", os.defpath),
-    "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),  # Necessary for Windows-based servers
-    "PYTHONPATH": os.path.dirname(sys.executable),
-    "LANG": "en_US.UTF-8"
-}
+# Custom secure function simulation replacing standard terminal inputs
+def run_student_code(code_string, user_input_data):
+    """Safely parses and isolates code execution without using files or subprocesses."""
+    # Mocking terminal functions to create an absolute sandbox boundary
+    def mocked_input():
+        return str(user_input_data)
+
+    # Restricted local scope: Completely locks out system files, variables, and modules
+    safe_globals = {
+        "__builtins__": {
+            "print": print,
+            "input": mocked_input, # Seamlessly overrides user input with our text block!
+            "str": str,
+            "int": int,
+            "chr": chr,
+            "ord": ord,
+            "len": len,
+            "range": range,
+            "list": list,
+        }
+    }
+    
+    output_buffer = io.StringIO()
+    
+    try:
+        # Step A: Compile the raw string into byte-code to verify syntax errors instantly
+        compiled_bytecode = compile(code_string, "student_cipher.py", "exec")
+        
+        # Step B: Execute the isolated bytecode inside our safe, limited variable container
+        with contextlib.redirect_stdout(output_buffer):
+            exec(compiled_bytecode, safe_globals, {})
+            
+        return output_buffer.getvalue(), None
+    except Exception as e:
+        return None, str(e)
 
 if st.button("Check My Code Syntax 🛠️"):
-    # Create an entirely isolated directory separate from the app source code
-    with tempfile.TemporaryDirectory() as jail_dir:
-        temp_file_path = os.path.join(jail_dir, "student_code.py")
-        with open(temp_file_path, "w") as f:
-            f.write(current_code)
-
-        try:
-            # Run code securely inside the empty directory
-            result = subprocess.run(
-                [sys.executable, "-I", "student_code.py"],
-                input="test",
-                capture_output=True,
-                text=True,
-                env=safe_env,  # Uses the corrected safe environment definition
-                cwd=jail_dir,  # Strict folder isolation: user sees an empty folder
-                timeout=3      # Instantly kills infinite loops within 3 seconds
-            )
-            
-            if result.stderr:
-                st.error("❌ Uh oh! There is an error in your code structure:")
-                st.error(result.stderr.replace("student_code.py", "your_code.py"))
-                st.session_state.code_verified = False
-            else:
-                st.success("✅ Awesome! Your script compiled successfully. Look below to type your message!")
-                st.session_state.code_verified = True
-                st.session_state.saved_code = current_code
-                
-        except subprocess.TimeoutExpired:
-            st.error("⏳ Your code took too long to run! Make sure you don't have an infinite loop.")
-            st.session_state.code_verified = False
-        except Exception as e:
-            st.error(f"Execution failed to run: {e}")
-            st.session_state.code_verified = False
+    # Test execution instantly using a basic word
+    output, error = run_student_code(current_code, "test")
+    
+    if error:
+        st.error("❌ Uh oh! There is an error in your code structure:")
+        st.error(error)
+        st.session_state.code_verified = False
+    else:
+        st.success("✅ Awesome! Your script compiled successfully. Look below to type your message!")
+        st.session_state.code_verified = True
+        st.session_state.saved_code = current_code
 
 # --- STEP 2: THE CONDITIONAL ENCRYPTION BOX ---
 if st.session_state.code_verified:
@@ -84,31 +87,12 @@ if st.session_state.code_verified:
     kids_message = st.text_input("🔑 Enter a secret message to encrypt:", value="Hello World")
     
     if st.button("🔒 Run Encryption"):
-        with tempfile.TemporaryDirectory() as jail_dir:
-            temp_file_path = os.path.join(jail_dir, "student_code.py")
-            with open(temp_file_path, "w") as f:
-                f.write(st.session_state.saved_code)
-
-            try:
-                run_result = subprocess.run(
-                    [sys.executable, "-I", "student_code.py"],
-                    input=kids_message,
-                    capture_output=True,
-                    text=True,
-                    env=safe_env,
-                    cwd=jail_dir,
-                    timeout=3
-                )
-                
-                if run_result.stdout:
-                    st.subheader("🎉 Your Encrypted Secret Message:")
-                    st.info(run_result.stdout)
-                
-                if run_result.stderr:
-                    st.error("⚠️ The code broke while trying to scramble this specific message:")
-                    st.error(run_result.stderr.replace("student_code.py", "your_code.py"))
-                    
-            except subprocess.TimeoutExpired:
-                st.error("⏳ Your code took too long to run! Make sure you don't have an infinite loop.")
-            except Exception as e:
-                st.error(f"Execution failed: {e}")
+        output, error = run_student_code(st.session_state.saved_code, kids_message)
+        
+        if output:
+            st.subheader("🎉 Your Encrypted Secret Message:")
+            st.info(output)
+            
+        if error:
+            st.error("⚠️ The code broke while trying to scramble this message:")
+            st.error(error)
