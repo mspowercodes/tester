@@ -3,23 +3,21 @@ import sys
 import io
 import traceback
 import ast
+import inspect
 
 st.set_page_config(
-    page_title="Instant Python Output",
+    page_title="Interactive Python Sandbox",
     page_icon="⚡",
     layout="wide"
 )
 
-st.title("⚡ Instant Auto-Print Python Runner")
-st.markdown("Type any Python script below. All results, variables, and outputs will display automatically.")
+st.title("⚡ Interactive Python Function Sandbox")
+st.markdown("Define your encryption function below. The app will automatically detect it and let you test it live!")
 
-# Default starter code showing a multi-line function assignment and execution
+# Default template code
 default_code = """def caesar_shift3(message):
     table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "DEFGHIJKLMNOPQRSTUVWXYZABC")
     return message.translate(table)
-
-# Run the function with a secret message
-secret = caesar_shift3("hello world")
 """
 
 col1, col2 = st.columns(2)
@@ -30,80 +28,71 @@ with col1:
         user_code = st.text_area(
             label="Your Python Script:",
             value=default_code,
-            height=400
+            height=300
         )
-        submit_button = st.form_submit_button(label="▶ Run Script")
+        submit_button = st.form_submit_button(label="🔨 Build & Parse Function")
 
 with col2:
-    st.subheader("Output View")
+    st.subheader("Live Output Testing")
     
+    # Track the active environment using Streamlit session state
+    if "exec_env" not in st.session_state:
+        st.session_state.exec_env = {}
+    if "detected_functions" not in st.session_state:
+        st.session_state.detected_functions = []
+
     if submit_button:
         output_buffer = io.StringIO()
         sys.stdout = output_buffer
         
-        # Track baseline environment keys to filter out later
-        baseline_globals = set(globals().keys()) | {'baseline_globals', 'exec_globals'}
-        exec_globals = {}
+        # New clean scope environment
+        current_env = {}
         
         try:
-            # 1. Parse the entire script into a complete Abstract Syntax Tree structure
-            cleaned_code = user_code.strip()
-            tree = ast.parse(cleaned_code)
-            final_eval = None
+            # Execute the user's code block to load their function definitions
+            exec(user_code, current_env)
             
-            # 2. Check if the very last structural block is a raw expression (like calling a function or variable)
-            if tree.body and isinstance(tree.body[-1], ast.Expr):
-                last_expr = tree.body.pop()
-                
-                # Execute all preceding code blocks together safely
-                if tree.body:
-                    exec(compile(tree, filename="<ast>", mode="exec"), exec_globals)
-                
-                # Explicitly evaluate only the final standalone expression line
-                expr_mode = ast.Expression(last_expr.value)
-                final_eval = eval(compile(expr_mode, filename="<ast>", mode="eval"), exec_globals)
-            else:
-                # If the last block is a statement (like an assignment 'secret = ...'), run the full tree safely
-                exec(compile(tree, filename="<ast>", mode="exec"), exec_globals)
+            # Find all custom functions defined by the user
+            found_funcs = [
+                name for name, obj in current_env.items() 
+                if inspect.isfunction(obj) and not name.startswith('__')
+            ]
             
-            # 3. Restore the server console defaults
             sys.stdout = sys.__stdout__
-            console_prints = output_buffer.getvalue()
             
-            # 4. AUTO-PRINT DISPLAY ENGINE
-            has_displayed_content = False
+            # Save variables into session state so they persist across text entry refreshes
+            st.session_state.exec_env = current_env
+            st.session_state.detected_functions = found_funcs
             
-            # Display any standard print() commands if the user used them
-            if console_prints.strip():
-                st.write("**Console Output:**")
-                st.code(console_prints, language="text")
-                has_displayed_content = True
-                
-            # Display raw trailing calculation or function execution results
-            if final_eval is not None:
-                st.success(f"**Returned Value:** `{final_eval}`")
-                has_displayed_content = True
-                
-            # Automatically find and print all variables created anywhere in the script
-            user_variables = {
-                k: v for k, v in exec_globals.items() 
-                if k not in baseline_globals and not k.startswith('__') and not callable(v)
-            }
-            
-            if user_variables:
-                st.write("**Created Variables (Auto-Printed):**")
-                for name, val in user_variables.items():
-                    st.info(f"👉 `{name}` = `{val}`")
-                has_displayed_content = True
-                
-            if not has_displayed_content:
-                st.warning("⚠️ Script completed successfully, but did not generate any variable outputs or text values.")
+            if found_funcs:
+                st.success(f"🎉 Success! Detected function: `{found_funcs[0]}()`")
+            else:
+                st.warning("⚠️ Script ran fine, but no functions were defined. Try starting your code with `def function_name(message):`")
                 
         except Exception as e:
-            # Always ensure the server environment is restored even during structural errors
             sys.stdout = sys.__stdout__
-            error_msg = traceback.format_exc()
             st.error("❌ Python Execution Error:")
-            st.code(error_msg, language="python")
+            st.code(traceback.format_exc(), language="python")
+
+    # --- LIVE INTERACTION ZONE ---
+    if st.session_state.detected_functions:
+        st.write("---")
+        st.write("### 🧪 Test Your Code Live")
+        
+        # Pick the first custom function the user created
+        target_func_name = st.session_state.detected_functions[0]
+        target_func = st.session_state.exec_env[target_func_name]
+        
+        # Provide a live interactive text input
+        test_input = st.text_input("Enter text to pass into your function:", value="hello world")
+        
+        # Automatically run their function behind the scenes using their live text input
+        try:
+            live_result = target_func(test_input)
+            
+            st.write("**Function Output:**")
+            st.success(f"`{live_result}`")
+        except Exception as e:
+            st.error(f"Error running `{target_func_name}`: {e}")
     else:
-        st.caption("Waiting for script execution...")
+        st.caption("Awaiting successful function build from the left panel...")
