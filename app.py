@@ -4,39 +4,47 @@ import tempfile
 import os
 import re
 import sys
-from streamlit_ace import st_ace  # Safe editor with line numbers
 
 st.set_page_config(page_title="Function Tester Sandbox", layout="wide", page_icon="💻")
 st.title("💻 Live Function Validator & Tester")
 
+# Pre-populated script example for the classroom
+starter_code = """def caesar_shift3(message):
+    table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "defghijklmnopqrstuvwxyzabc")
+    return message.translate(table)
+"""
+
+# Main visual split
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("📝 1. Write Your Python Function")
     
-    starter_code = """def caesar_shift3(message):
-    table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "defghijklmnopqrstuvwxyzabc")
-    return message.translate(table)
-"""
+    # --- FIXED VISUAL LINE NUMBER LAYOUT ---
+    # [0.1, 1.9] sets relative widths so line numbers stay compactly on the left
+    num_col, code_col = st.columns([0.1, 1.9])
     
-    # st_ace provides real line numbers and code highlighting.
-    # The output 'user_code' remains raw Python code without line numbers inside the string.
-    user_code = st_ace(
-        value=starter_code,
-        language="python",
-        theme="monokai",
-        keybinding="vscode",
-        font_size=14,
-        tab_size=4,
-        height=380,
-        show_gutter=True,  # This explicitly enables line numbers on the left side
-        wrap=True
-    )
+    with num_col:
+        # Generates vertical numbers from 1 to 20 to guide the students visually
+        st.markdown(
+            "<div style='text-align: right; color: gray; font-family: monospace; line-height: 2.15; padding-top: 27px; font-size: 14px;'>" + 
+            "<br>".join(str(i) for i in range(1, 21)) + 
+            "</div>", 
+            unsafe_allow_html=True
+        )
+        
+    with code_col:
+        user_code = st.text_area(
+            "Python Code Editor:", 
+            value=starter_code, 
+            height=465, 
+            label_visibility="collapsed" # Hides duplicate text headers to save space
+        )
 
 with col2:
     st.subheader("⚙️ 2. Dynamic Test Inputs")
     
-    # Safely scan the clean user string for the function name
+    # Clean string search for the student's custom named function
     match = re.search(r"def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(", user_code)
     detected_function = match.group(1) if match else "caesar_shift3"
     st.info(f"🔄 Detected Function Name: `{detected_function}`")
@@ -48,10 +56,11 @@ with col2:
     st.subheader("🖥️ 3. Live Encrypted Output")
 
     if run_button:
-        # Create temporary file and close it to avoid OS system locks
+        # Generate temporary files cleanly to avoid deep operating system blocks
         temp_file = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
         temp_path = temp_file.name
         
+        # Test harness injected strictly beneath their workspace logic
         harness_logic = f"""
 import sys
 try:
@@ -65,10 +74,10 @@ except Exception as e:
 """
         full_executable_script = user_code + "\n" + harness_logic
         temp_file.write(full_executable_script.encode('utf-8'))
-        temp_file.close() 
+        temp_file.close()  # Immediately free up the system thread file handle
 
         try:
-            # Safely pass the script to the background subprocess execution layer
+            # Safely pass execution task straight to isolated process layer
             process = subprocess.run(
                 [sys.executable, temp_path],
                 capture_output=True,
@@ -93,10 +102,10 @@ except Exception as e:
                 st.error("❌ Runtime Error Found inside your script:")
                 st.code(stderr.replace(temp_path, "your_script.py"), language="python")
             else:
-                st.warning(f"⚠️ Did you forget `return message` inside `{detected_function}`?")
+                st.warning(f"⚠️ Did you forget a `return` statement inside `{detected_function}`?")
 
         except subprocess.TimeoutExpired:
-            st.error("🐢 CPU Timeout! Infinite loop detected.")
+            st.error("🐢 CPU Timeout! Infinite loop detected inside code structure.")
             
         finally:
             if os.path.exists(temp_path):
