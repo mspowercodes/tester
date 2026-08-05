@@ -2,8 +2,8 @@ import streamlit as st
 import sys
 import io
 import traceback
+import ast
 
-# 1. Configure the page setup
 st.set_page_config(
     page_title="Interactive Python Executor",
     page_icon="🐍",
@@ -11,32 +11,32 @@ st.set_page_config(
 )
 
 st.title("🐍 Interactive Python Script Runner")
-st.markdown("Type your Python code below and click **Run Script** to see the console output.")
+st.markdown("Type your Python code below and click **Run Script** to see the output.")
 
-# 2. Define a default starter script for the user
-default_code = """# Write your Python code here
-def greet(name):
-    return f"Hello, {name}!"
+# Default starter code that demonstrates both printing and expressions
+default_code = """# Option 1: Use print statements
+print("Hello from Streamlit Cloud!")
 
-print(greet("Streamlit User"))
+# Option 2: Write a function and call it
+def add_numbers(a, b):
+    return a + b
 
-# Try printing a loop
-for i in range(3):
-    print(f"Processing item {i}...")
+result = add_numbers(10, 5)
+print(f"The result is: {result}")
+
+# Option 3: Just type a raw value or calculation on the final line
+2 + 2
 """
 
-# 3. Create a layout with two columns
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Input Python Script")
-    # Use form to prevent the app from refreshing on every keystroke
     with st.form(key="code_form"):
         user_code = st.text_area(
             label="Write or paste your code here:",
             value=default_code,
-            height=400,
-            help="Note: Execution runs in the host environment. Avoid calling blocking loops."
+            height=400
         )
         submit_button = st.form_submit_button(label="▶ Run Script")
 
@@ -44,35 +44,53 @@ with col2:
     st.subheader("Console Output")
     
     if submit_button:
-        # Redirect standard output to catch print statements
+        # 1. Setup execution environment and console redirect
         output_buffer = io.StringIO()
         sys.stdout = output_buffer
+        exec_globals = {}
         
         try:
-            # Execute the user code in a dedicated global dictionary scope
-            # Using an explicit dictionary protects the local app namespace
-            exec_globals = {}
-            exec(user_code, exec_globals)
+            # 2. Advanced Parsing: Separate the code body from the final line
+            # This allows us to capture raw expressions (like "2+2") if there are no print statements
+            cleaned_code = user_code.strip()
+            lines = cleaned_code.split('\n')
             
-            # Revert standard output back to system default
+            if lines:
+                body = '\n'.join(lines[:-1])
+                last_line = lines[-1]
+                
+                # Execute everything except the last line first
+                if body:
+                    exec(body, exec_globals)
+                
+                # Try to evaluate the last line as an expression to return a value
+                try:
+                    compiled_last = compile(last_line, '<string>', 'eval')
+                    eval_result = eval(compiled_last, exec_globals)
+                    # If it successfully evaluated and wasn't None, print it to the buffer
+                    if eval_result is not None:
+                        print(eval_result)
+                except Exception:
+                    # If the last line is a statement (like a loop or assignment), execute it normally
+                    exec(last_line, exec_globals)
+            else:
+                exec(user_code, exec_globals)
+                
+            # 3. Reset console output back to system defaults
             sys.stdout = sys.__stdout__
-            
-            # Retrieve the captured string print statements
             captured_output = output_buffer.getvalue()
             
-            # Display results
-            if captured_output:
+            # 4. Display the gathered output to the user
+            if captured_output.strip():
                 st.code(captured_output, language="text")
             else:
-                st.info("Script executed successfully, but returned no print output.")
+                st.warning("⚠️ Script ran fine, but generated no output text. Make sure to use print() or put an expression on the final line!")
                 
         except Exception as e:
-            # Safely revert standard output even if an error hits
+            # Safety catch: Always restore stdout if the user's code crashes
             sys.stdout = sys.__stdout__
-            
-            # Capture the exact line location and message of the error
             error_msg = traceback.format_exc()
-            st.error("An error occurred during execution:")
+            st.error("❌ An error occurred during execution:")
             st.code(error_msg, language="python")
     else:
         st.caption("Waiting for script execution...")
