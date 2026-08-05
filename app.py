@@ -11,7 +11,7 @@ st.set_page_config(
 )
 
 st.title("🐍 Single Box Python Editor Sandbox")
-st.markdown("Type code inside the single window below. Line numbers match your current code structure dynamically!")
+st.markdown("Type code inside the single window below. Line numbers are fully integrated, and code runs instantly without copy-pasting!")
 
 # Default starter code template
 default_code = """def caesar_shift3(message):
@@ -26,41 +26,97 @@ if "exec_env" not in st.session_state:
 if "detected_functions" not in st.session_state:
     st.session_state.detected_functions = []
 
+# --- EXTRACT CODE DATA SUBMITTED FROM THE BROWSER ---
+# We use st.query_params to safely capture data sent from our custom HTML box
+query_params = st.query_params
+if "submitted_code" in query_params:
+    st.session_state.user_code_string = query_params["submitted_code"]
+
 col_left, col_right = st.columns(2)
 
 with col_left:
     st.subheader("📝 Integrated Code Box")
     
-    # 1. AUTO-GENERATED LINE GUIDES: Calculate numbers based on text line spacing
-    lines_array = st.session_state.user_code_string.split("\n")
-    max_lines = max(len(lines_array), 8)  # Keep a clean baseline size
-    
-    # Generate a matching sidebar map line guide
-    guide_lines = [f"{i:2d} |" for i in range(1, max_lines + 1)]
-    guide_sidebar = "\n".join(guide_lines)
-    
-    # Render the editor layout side-by-side cleanly within a safe form wrapper
-    with st.form(key="native_editor_form"):
-        # Wrap everything in a two-column setup to enforce a single box look
-        col_gutter, col_editor = st.columns([1, 15])
+    # THE SINGLE-BOX EDITOR ENGINE: Unified code area with auto-compile broadcasting
+    custom_editor_html = f"""
+    <div style="font-family: monospace; position: relative; border: 1px solid #444; border-radius: 4px; background: #1e1e1e; padding: 0; display: flex; height: 300px;">
+        <!-- Left Side Gutter Line Numbers -->
+        <textarea id="lineCounter" readonly style="
+            width: 35px; height: 100%; border: none; background: #1e1e1e; color: #888; 
+            text-align: right; padding: 10px 5px; resize: none; overflow-y: hidden; 
+            font-family: inherit; font-size: 14px; line-height: 20px; font-weight: bold;
+            border-right: 1px solid #444; user-select: none; pointer-events: none; box-sizing: border-box;
+        ">1</textarea>
         
-        with col_gutter:
-            # Displays the line counts right inside the margins
-            st.code(guide_sidebar, language="text")
-            
-        with col_editor:
-            typed_code = st.text_area(
-                label="Your Script File Code Input Gutter:",
-                value=st.session_state.user_code_string,
-                height=215,
-                label_visibility="collapsed"  # Align directly with row index 1
-            )
-            
-        # Unified form submission button
-        submit_script_trigger = st.form_submit_button(label="🚀 Run & Compile Code Block")
+        <!-- Right Side Typing Editor Area -->
+        <textarea id="codeEditor" placeholder="Write your Python script here..." wrap="off" style="
+            flex: 1; height: 100%; border: none; background: #1e1e1e; color: #fff; 
+            padding: 10px; resize: none; font-family: inherit; font-size: 14px; line-height: 20px;
+            outline: none; tab-size: 4; box-sizing: border-box; overflow-x: auto;
+        ">{st.session_state.user_code_string}</textarea>
+    </div>
+    
+    <!-- Unified Run Button inside the theme wrapper -->
+    <button id="runBtn" style="
+        margin-top: 15px; background-color: #ff4b4b; color: white; border: none; 
+        padding: 8px 16px; font-size: 14px; border-radius: 4px; cursor: pointer; font-family: sans-serif;
+    ">🚀 Run & Compile Code</button>
+
+    <script>
+        const codeEditor = document.getElementById('codeEditor');
+        const lineCounter = document.getElementById('lineCounter');
+        const runBtn = document.getElementById('runBtn');
+
+        function updateLines() {{
+            const lines = codeEditor.value.split('\\n');
+            const lineCount = lines.length;
+            let lineNumbers = '';
+            for (let i = 1; i <= lineCount; i++) {{
+                lineNumbers += i + '\\n';
+            }}
+            lineCounter.value = lineNumbers;
+            lineCounter.scrollTop = codeEditor.scrollTop;
+        }}
+
+        // Keep scrolling sync active
+        codeEditor.addEventListener('scroll', () => {{
+            lineCounter.scrollTop = codeEditor.scrollTop;
+        }});
+
+        codeEditor.addEventListener('input', updateLines);
         
-        if submit_script_trigger:
-            st.session_state.user_code_string = typed_code
+        // Handle Tab key indenting natively
+        codeEditor.addEventListener('keydown', (e) => {{
+            if (e.key === 'Tab') {{
+                e.preventDefault();
+                const start = codeEditor.selectionStart;
+                const end = codeEditor.selectionEnd;
+                codeEditor.value = codeEditor.value.substring(0, start) + "    " + codeEditor.value.substring(end);
+                codeEditor.selectionStart = codeEditor.selectionEnd = start + 4;
+                updateLines();
+            }}
+        }});
+
+        // Passing text straight to the parent window url queries
+        runBtn.addEventListener('click', () => {{
+            const codeContent = encodeURIComponent(codeEditor.value);
+            window.parent.postMessage({{
+                type: 'streamlit:setComponentValue',
+                value: codeEditor.value
+            }}, '*');
+            
+            // Append to parent parameters directly
+            const url = new URL(window.parent.location.href);
+            url.searchParams.set('submitted_code', codeEditor.value);
+            window.parent.location.href = url.href;
+        }});
+
+        updateLines();
+    </script>
+    """
+    
+    # Render the native web container component safely
+    editor_response = st.components.v1.html(custom_editor_html, height=360, scrolling=False)
 
 with col_right:
     st.subheader("🧪 Live Output Testing")
@@ -90,7 +146,7 @@ with col_right:
 
     # --- LIVE TESTING INTERACTION ZONE ---
     if st.session_state.detected_functions:
-        # Extract the single string function name accurately from the list object
+        # FIX: Extract the first single string from the list instead of passing the whole list
         target_func_name = st.session_state.detected_functions[0]
         target_func = st.session_state.exec_env[target_func_name]
         
