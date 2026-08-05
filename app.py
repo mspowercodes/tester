@@ -1,111 +1,80 @@
-import streamlit as st
-import subprocess
-import tempfile
-import os
-import re
-import sys
+with col_left:
+    st.subheader("📝 Integrated Code Box")
+         
+    custom_editor_html = f"""
+    <div style="font-family: monospace; position: relative; border: 1px solid #444; border-radius: 4px; background: #1e1e1e; padding: 0; display: flex; height: 300px;">
+        <!-- Left Side Gutter Line Numbers -->
+        <textarea id="lineCounter" readonly style="
+            width: 35px; height: 100%; border: none; background: #1e1e1e; color: #888; 
+            text-align: right; padding: 10px 5px; resize: none; overflow-y: hidden; 
+            font-family: inherit; font-size: 14px; line-height: 20px; font-weight: bold;
+            border-right: 1px solid #444; user-select: none; pointer-events: none; box-sizing: border-box;
+        ">1</textarea>
+                 
+        <!-- Right Side Typing Editor Area -->
+        <textarea id="codeEditor" placeholder="Write your Python script here..." wrap="off" style="
+            flex: 1; height: 100%; border: none; background: #1e1e1e; color: #fff; 
+            padding: 10px; resize: none; font-family: inherit; font-size: 14px; line-height: 20px;
+            outline: none; tab-size: 4; box-sizing: border-box; overflow-x: auto;
+        ">{st.session_state.user_code_string}</textarea>
+    </div>
+         
+    <!-- Unified Run Button inside the theme wrapper -->
+    <button id="runBtn" style="
+        margin-top: 15px; background-color: #ff4b4b; color: white; border: none; 
+        padding: 8px 16px; font-size: 14px; border-radius: 4px; cursor: pointer; font-family: sans-serif;
+    ">🚀 Run & Compile Code</button>
 
-st.set_page_config(page_title="Function Tester Sandbox", layout="wide", page_icon="💻")
-st.title("💻 Live Function Validator & Tester")
+    <script>
+        const codeEditor = document.getElementById('codeEditor');
+        const lineCounter = document.getElementById('lineCounter');
+        const runBtn = document.getElementById('runBtn');
 
-starter_code = """def caesar_shift3(message):
-    table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "defghijklmnopqrstuvwxyzabc")
-    return message.translate(table)
-"""
+        function updateLines() {{
+            const lines = codeEditor.value.split('\\n');
+            const lineCount = lines.length;
+            let lineNumbers = '';
+            for (let i = 1; i <= lineCount; i++) {{
+                lineNumbers += i + '\\n';
+            }}
+            lineCounter.value = lineNumbers;
+            lineCounter.scrollTop = codeEditor.scrollTop;
+        }}
 
-col1, col2 = st.columns(2)
+        codeEditor.addEventListener('scroll', () => {{
+            lineCounter.scrollTop = codeEditor.scrollTop;
+        }});
 
-with col1:
-    st.subheader("📝 1. Write Your Python Function")
-    
-    # CRITICAL FIX: The form stops Streamlit from rerunning on every keystroke
-    with st.form("code_form"):
-        num_col, code_col = st.columns([0.1, 1.9])
-        
-        with num_col:
-            st.markdown(
-                "<div style='text-align: right; color: gray; font-family: monospace; line-height: 2.15; padding-top: 5px; font-size: 14px;'>" + 
-                "<br>".join(str(i) for i in range(1, 21)) + 
-                "</div>", 
-                unsafe_allow_html=True
-            )
-            
-        with code_col:
-            user_code = st.text_area(
-                "Python Code Editor:", 
-                value=starter_code, 
-                height=465, 
-                label_visibility="collapsed"
-            )
-            
-        # The form submit button locks the text area data safely
-        submit_code = st.form_submit_button("🔒 Lock Code Changes", type="secondary", use_container_width=True)
+        codeEditor.addEventListener('input', updateLines);
+                 
+        codeEditor.addEventListener('keydown', (e) => {{
+            if (e.key === 'Tab') {{
+                e.preventDefault();
+                const start = codeEditor.selectionStart;
+                const end = codeEditor.selectionEnd;
+                codeEditor.value = codeEditor.value.substring(0, start) + "    " + codeEditor.value.substring(end);
+                codeEditor.selectionStart = codeEditor.selectionEnd = start + 4;
+                updateLines();
+            }}
+        }});
 
-with col2:
-    st.subheader("⚙️ 2. Dynamic Test Inputs")
-    
-    # Process the regex search safely now that user_code won't change mid-type
-    match = re.search(r"def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(", user_code)
-    detected_function = match.group(1) if match else "caesar_shift3"
-    st.info(f"🔄 Detected Function Name: `{detected_function}`")
-    
-    user_message = st.text_input("Enter a message to pass into your function:", value="hello world")
-    run_button = st.button("🚀 Run My Function", type="primary", use_container_width=True)
-    
-    st.divider()
-    st.subheader("🖥️ 3. Live Encrypted Output")
+        // FIXED: Streamlit uses Streamlit.setComponentValue via messaging protocol
+        runBtn.addEventListener('click', () => {{
+            window.parent.postMessage({{
+                isStreamlitMessage: true,
+                type: "streamlit:setComponentValue",
+                value: codeEditor.value
+            }}, "*");
+        }});
 
-    if run_button:
-        temp_file = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
-        temp_path = temp_file.name
-        
-        harness_logic = f"""
-import sys
-try:
-    result = {detected_function}("{user_message}")
-    print(f"[FUNCTION_RETURN]{{result}}")
-except NameError:
-    print("[HARNESS_ERROR] Could not find a function named '{detected_function}'.", file=sys.stderr)
-except Exception as e:
-    import traceback
-    print(traceback.format_exc(), file=sys.stderr)
-"""
-        full_executable_script = user_code + "\n" + harness_logic
-        temp_file.write(full_executable_script.encode('utf-8'))
-        temp_file.close()  
+        updateLines();
+    </script>
+    """
+         
+    # Capture the return value from the HTML component
+    editor_response = st.components.v1.html(custom_editor_html, height=360, scrolling=False)
 
-        try:
-            process = subprocess.run(
-                [sys.executable, temp_path],
-                capture_output=True,
-                text=True,
-                timeout=3
-            )
-            
-            stdout = process.stdout
-            stderr = process.stderr
-            
-            if "[FUNCTION_RETURN]" in stdout:
-                for line in stdout.split("\n"):
-                    if line.startswith("[FUNCTION_RETURN]"):
-                        final_encrypted_text = line.replace("[FUNCTION_RETURN]", "")
-                        st.success("🎉 Function successfully verified!")
-                        st.markdown(f"**📥 Sent to `{detected_function}`:**")
-                        st.code(user_message, language="text")
-                        st.markdown("**📤 Encrypted Result Return:**")
-                        st.code(final_encrypted_text, language="text")
-                        break
-            elif stderr:
-                st.error("❌ Runtime Error Found inside your script:")
-                st.code(stderr.replace(temp_path, "your_script.py"), language="python")
-            else:
-                st.warning(f"⚠️ Did you forget a `return` statement inside `{detected_function}`?")
-
-        except subprocess.TimeoutExpired:
-            st.error("🐢 CPU Timeout! Infinite loop detected inside code structure.")
-            
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-    else:
-        st.info("The output screen is resting. Click 'Run My Function' above to see it update.")
+    # FIXED: Update session state if the component sent back new text
+    if editor_response is not None:
+        st.session_state.user_code_string = editor_response
+        st.rerun()
