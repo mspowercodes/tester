@@ -3,7 +3,7 @@ import sys
 import io
 import traceback
 import inspect
-from streamlit_monaco import st_monaco  # 👈 Import the official VS Code core wrapper
+from streamlit_monaco import st_monaco  # Import the official VS Code core wrapper
 
 st.set_page_config(
     page_title="VS Code Sandbox",
@@ -30,12 +30,11 @@ col_left, col_right = st.columns(2)
 with col_left:
     st.subheader("📝 Editor Window")
     
-    # 👈 Render the live VS Code engine module
+    # FIX: Removed the invalid 'theme' argument to stop the TypeError crash
     user_code = st_monaco(
         value=default_code,
         height="300px",
-        language="python",
-        theme="vs-dark"
+        language="python"
     )
     
     # Simple submit button to compile the script content
@@ -72,7 +71,7 @@ with col_right:
 
     # --- LIVE TESTING INTERACTION ZONE ---
     if st.session_state.detected_functions:
-        target_func_name = st.session_state.detected_functions[0]
+        target_func_name = st.session_state.detected_functions
         target_func = st.session_state.exec_env[target_func_name]
         
         st.success(f"🎉 Active function: `{target_func_name}()`")
