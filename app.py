@@ -11,7 +11,7 @@ st.set_page_config(
 )
 
 st.title("⚡ Interactive Python Function Sandbox")
-st.markdown("Define your encryption function below. Line numbers are displayed down the left margin!")
+st.markdown("Define your encryption function below. Line numbers are rendered down the left margin.")
 
 # Default template code
 default_code = """def caesar_shift3(message):
@@ -27,36 +27,54 @@ if "exec_env" not in st.session_state:
 if "detected_functions" not in st.session_state:
     st.session_state.detected_functions = []
 
-# Create our two main panels: Left for writing code, Right for checking results
+# Main split for the interface
 col_left_panel, col_right_panel = st.columns(2)
 
 with col_left_panel:
     st.subheader("Input Python Script")
     
-    # 1. FIXED SYNTAX: Explicit weights [1, 19] align the number column correctly
-    col_numbers, col_textarea = st.columns([1, 19])
+    # --- CRASH-PROOF LINE NUMBER MARGIN ---
+    # This generates a stationary vertical column of numbers 1 to 15 
+    numbers_html = ""
+    for i in range(1, 16):
+        numbers_html += f"<div>{i}</div>"
+        
+    # Injecting a styled sidebar margin that sits comfortably next to the text box
+    st.markdown(
+        f"""
+        <div style="display: flex; margin-bottom: -45px;">
+            <div style="
+                font-family: monospace; 
+                font-size: 14px; 
+                line-height: 23px; 
+                color: #888; 
+                text-align: right; 
+                padding-right: 10px; 
+                border-right: 2px solid #444; 
+                margin-top: 48px;
+                height: 350px;
+                user-select: none;
+                min-width: 25px;
+            ">
+                {numbers_html}
+            </div>
+            <div style="flex-grow: 1; padding-left: 10px;">
+                <!-- This empty container forces the flexbox space to remain aligned -->
+            </div>
+        </div>
+        """, 
+        unsafe_allowed_html=True
+    )
     
-    with col_numbers:
-        # Pushes the numbers down slightly so they match up perfectly with line 1 of the typing box
-        st.markdown("<div style='height: 43px;'></div>", unsafe_allowed_html=True)
-        
-        # Build a stationary vertical list of 1 to 15 line numbers
-        numbers_layout = "<div style='border-right: 1px solid #444; padding-right: 5px;'>"
-        for i in range(1, 16):
-            numbers_layout += f"<div style='line-height: 25.5px; font-family: monospace; color: #888; text-align: right;'>{i}</div>"
-        numbers_layout += "</div>"
-            
-        st.markdown(numbers_layout, unsafe_allowed_html=True)
-        
-    with col_textarea:
-        with st.form(key="code_form"):
-            user_code = st.text_area(
-                label="Your Python Script (Max 15 lines visible at once):",
-                value=st.session_state.code_text,
-                height=385,  # This height lines up perfectly with our 15 vertical numbers
-                label_visibility="visible"
-            )
-            submit_button = st.form_submit_button(label="🚀 Activate My Function")
+    # Standard input form (completely detached from layout constraints to prevent errors)
+    with st.form(key="code_form"):
+        user_code = st.text_area(
+            label="Your Python Script:",
+            value=st.session_state.code_text,
+            height=350,
+            label_visibility="visible"
+        )
+        submit_button = st.form_submit_button(label="🚀 Activate My Function")
 
 with col_right_panel:
     st.subheader("Live Output Testing")
@@ -67,7 +85,6 @@ with col_right_panel:
         current_env = {}
         
         try:
-            # Run the code blocks to fetch the functions
             exec(user_code, current_env)
             
             found_funcs = [
