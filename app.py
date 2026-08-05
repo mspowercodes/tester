@@ -1,23 +1,8 @@
 import streamlit as st
 
-# The simpler student-friendly function using strings ("" and +=)
 def caesar_shift3(message):
-    plaintext = "abcdefghijklmnopqrstuvwxyz"
-    ciphertext = "DEFGHIJKLMNOPQRSTUVWXYZABC"
-    
-    # 1. Start with a completely empty piece of text
-    encrypted_message = ""
-    
-    for char in message:
-        if char in plaintext:
-            number = plaintext.index(char)
-            # 2. Glue the secret letter directly onto the end
-            encrypted_message += ciphertext[number]
-        else:
-            # 3. Glue spaces or punctuation onto the end
-            encrypted_message += char
-            
-    return encrypted_message
+    table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "DEFGHIJKLMNOPQRSTUVWXYZABC")
+    return message.translate(table)
 
 # --- STREAMLIT INTERFACE ---
 st.title("The Cryptoclub - Chapter 1")
