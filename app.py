@@ -24,9 +24,11 @@ with col_left:
     # Run Button placed directly underneath the code block
     run_clicked = st.button("🚀 Run & Test Code", type="primary")
 
-# Initialize session state to track if the engine should unlock the right side
+# Initialize persistent session states to prevent iframe re-rendering loops
 if "has_run" not in st.session_state:
     st.session_state.has_run = False
+if "test_msg_val" not in st.session_state:
+    st.session_state.test_msg_val = "hello world"
 
 if run_clicked:
     st.session_state.has_run = True
@@ -35,11 +37,18 @@ if run_clicked:
 with col_right:
     if st.session_state.has_run:
         st.header("2. Test Your Cipher")
-        test_message = st.text_input("📩 Enter message to encrypt:", value="hello world")
+        
+        # We use a built-in form to prevent Streamlit from wiping the iframe environment on "Enter"
+        with st.form("test_message_form"):
+            test_message = st.text_input("📩 Enter message to encrypt:", value=st.session_state.test_msg_val)
+            submit_message = st.form_submit_button("🔒 Encrypt Message")
+            
+        if submit_message:
+            st.session_state.test_msg_val = test_message
 
         # Escaping backslashes and quotes to make the code string safe for JavaScript insertion
         safe_code = raw_code_input.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
-        safe_message = test_message.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
+        safe_message = st.session_state.test_msg_val.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
 
         # Pure Python block for the browser (Separated to avoid f-string NameErrors on the server)
         python_payload = (
@@ -111,5 +120,5 @@ with col_right:
         st.subheader("3. Execution Results")
         components.html(html_code, height=250)
     else:
-        # Subtle placeholder text so the right side isn't completely empty before clicking
+        # Placeholder text so the right side isn't completely empty before clicking
         st.info("💡 Write your function on the left and click 'Run & Test Code' to open the testing suite here.")
