@@ -9,7 +9,7 @@ st.title("Cryptocoding in Python Lesson 1")
 st.write("This app encrypts lowercase text using a +3 Caesar cipher.")
 
 # Captures what the student types into the box
-user_text = st.text_input("Enter a message:", value="hello world")
+user_text = st.text_input("Message:", value="hello world")
 
 # Runs the simpler string function
 result = caesar_shift3(user_text)
