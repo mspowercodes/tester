@@ -2,6 +2,7 @@ import streamlit as st
 import sys
 import io
 import traceback
+import ast
 import inspect
 
 st.set_page_config(
@@ -27,9 +28,9 @@ with col1:
         user_code = st.text_area(
             label="Your Python Script:",
             value=default_code,
-            height=350
+            height=300
         )
-        submit_button = st.form_submit_button(label="🚀 Activate My Function")
+        submit_button = st.form_submit_button(label="🔨 Build & Parse Function")
 
 with col2:
     st.subheader("Live Output Testing")
@@ -63,6 +64,11 @@ with col2:
             st.session_state.exec_env = current_env
             st.session_state.detected_functions = found_funcs
             
+            if found_funcs:
+                st.success(f"🎉 Success! Detected function: `{found_funcs[0]}()`")
+            else:
+                st.warning("⚠️ Script ran fine, but no functions were defined. Try starting your code with `def function_name(message):`")
+                
         except Exception as e:
             sys.stdout = sys.__stdout__
             st.error("❌ Python Execution Error:")
@@ -70,13 +76,12 @@ with col2:
 
     # --- LIVE INTERACTION ZONE ---
     if st.session_state.detected_functions:
+        st.write("---")
+        st.write("### 🧪 Test Your Code Live")
+        
         # Pick the first custom function the user created
         target_func_name = st.session_state.detected_functions[0]
         target_func = st.session_state.exec_env[target_func_name]
-        
-        st.success(f"🎉 Active function ready: `{target_func_name}()`")
-        st.write("---")
-        st.write("### 🧪 Test Your Code Live")
         
         # Provide a live interactive text input
         test_input = st.text_input("Enter text to pass into your function:", value="hello world")
