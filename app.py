@@ -37,7 +37,7 @@ col_left, col_right = st.columns(2)
 with col_left:
     st.subheader("📝 Integrated Code Box")
     
-    # 1. THE SINGLE-BOX EDITOR ENGINE: Unified code area with auto-compile broadcasting
+    # THE SINGLE-BOX EDITOR ENGINE: Unified code area with auto-compile broadcasting
     custom_editor_html = f"""
     <div style="font-family: monospace; position: relative; border: 1px solid #444; border-radius: 4px; background: #1e1e1e; padding: 0; display: flex; height: 300px;">
         <!-- Left Side Gutter Line Numbers -->
@@ -97,16 +97,15 @@ with col_left:
             }}
         }});
 
-        # THE AUTOMATED BRIDGE FIX: Passing text straight to the parent window url queries
+        // Passing text straight to the parent window url queries
         runBtn.addEventListener('click', () => {{
             const codeContent = encodeURIComponent(codeEditor.value);
-            // This updates the top level parent URL params, triggering an instant Streamlit reload with the data
             window.parent.postMessage({{
                 type: 'streamlit:setComponentValue',
                 value: codeEditor.value
             }}, '*');
             
-            // Fallback for secure iframe clouds: append to parent parameters directly
+            // Append to parent parameters directly
             const url = new URL(window.parent.location.href);
             url.searchParams.set('submitted_code', codeEditor.value);
             window.parent.location.href = url.href;
@@ -117,7 +116,6 @@ with col_left:
     """
     
     # Render the native web container component safely
-    # We catch the returned data output natively directly from the object call wrapper
     editor_response = st.components.v1.html(custom_editor_html, height=360, scrolling=False)
 
 with col_right:
@@ -148,7 +146,8 @@ with col_right:
 
     # --- LIVE TESTING INTERACTION ZONE ---
     if st.session_state.detected_functions:
-        target_func_name = st.session_state.detected_functions
+        # FIX: Extract the first single string from the list instead of passing the whole list
+        target_func_name = st.session_state.detected_functions[0]
         target_func = st.session_state.exec_env[target_func_name]
         
         st.success(f"🎉 Active function ready: `{target_func_name}()`")
