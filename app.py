@@ -2,7 +2,6 @@ import streamlit as st
 import sys
 import io
 import traceback
-import inspect
 
 st.set_page_config(
     page_title="Single Box Editor Sandbox",
@@ -10,156 +9,105 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🐍 Single Box Python Editor Sandbox")
-st.markdown("Type code inside the single window below. Line numbers are fully integrated, and code runs instantly without copy-pasting!")
+# Inject custom CSS to convert standard text area into an elegant black IDE editor
+st.markdown("""
+<style>
+    /* Force the wrapper background to match a true code editor */
+    div[data-baseweb="textarea"] {
+        background-color: #1e1e1e !important;
+        border: 1px solid #444 !important;
+        border-radius: 4px !important;
+        padding: 5px !important;
+    }
+    /* Style the input text to behave like code lines */
+    textarea {
+        color: #ffffff !important;
+        font-family: 'Courier New', Courier, monospace !important;
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Default starter code template
+st.title("🐍 Single Box Python Editor Sandbox")
+st.markdown("Type your function inside the window below, click run, and test your encryption on the right side.")
+
+# Default starter template matching your Caesar shift concept
 default_code = """def caesar_shift3(message):
     table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "DEFGHIJKLMNOPQRSTUVWXYZABC")
-    return message.translate(table)"""
+    return message.translate(table)
+"""
 
-# Persistent memory states
-if "user_code_string" not in st.session_state:
-    st.session_state.user_code_string = default_code
-if "exec_env" not in st.session_state:
-    st.session_state.exec_env = {}
-if "detected_functions" not in st.session_state:
-    st.session_state.detected_functions = []
-
-# --- EXTRACT CODE DATA SUBMITTED FROM THE BROWSER ---
-# We use st.query_params to safely capture data sent from our custom HTML box
-query_params = st.query_params
-if "submitted_code" in query_params:
-    st.session_state.user_code_string = query_params["submitted_code"]
+# Maintain clean session states across browser actions
+if "user_code" not in st.session_state:
+    st.session_state.user_code = default_code
+if "execution_success" not in st.session_state:
+    st.session_state.execution_success = False
 
 col_left, col_right = st.columns(2)
 
 with col_left:
     st.subheader("📝 Integrated Code Box")
-        
-    # THE SINGLE-BOX EDITOR ENGINE: Unified code area with auto-compile broadcasting
-    custom_editor_html = f"""
-    <div style="font-family: monospace; position: relative; border: 1px solid #444; border-radius: 4px; background: #1e1e1e; padding: 0; display: flex; height: 300px;">
-        <!-- Left Side Gutter Line Numbers -->
-        <textarea id="lineCounter" readonly style="
-            width: 35px; height: 100%; border: none; background: #1e1e1e; color: #888; 
-            text-align: right; padding: 10px 5px; resize: none; overflow-y: hidden; 
-            font-family: inherit; font-size: 14px; line-height: 20px; font-weight: bold;
-            border-right: 1px solid #444; user-select: none; pointer-events: none; box-sizing: border-box;
-        ">1</textarea>
-                
-        <!-- Right Side Typing Editor Area -->
-        <textarea id="codeEditor" placeholder="Write your Python script here..." wrap="off" style="
-            flex: 1; height: 100%; border: none; background: #1e1e1e; color: #fff; 
-            padding: 10px; resize: none; font-family: inherit; font-size: 14px; line-height: 20px;
-            outline: none; tab-size: 4; box-sizing: border-box; overflow-x: auto;
-        ">{st.session_state.user_code_string}</textarea>
-    </div>
-        
-    <!-- Unified Run Button inside the theme wrapper -->
-    <button id="runBtn" style="
-        margin-top: 15px; background-color: #ff4b4b; color: white; border: none; 
-        padding: 8px 16px; font-size: 14px; border-radius: 4px; cursor: pointer; font-family: sans-serif;
-    ">🚀 Run & Compile Code</button>
-
-    <script>
-        const codeEditor = document.getElementById('codeEditor');
-        const lineCounter = document.getElementById('lineCounter');
-        const runBtn = document.getElementById('runBtn');
-
-        function updateLines() {{
-            const lines = codeEditor.value.split('\\n');
-            const lineCount = lines.length;
-            let lineNumbers = '';
-            for (let i = 1; i <= lineCount; i++) {{
-                lineNumbers += i + '\\n';
-            }}
-            lineCounter.value = lineNumbers;
-            lineCounter.scrollTop = codeEditor.scrollTop;
-        }}
-
-        // Keep scrolling sync active
-        codeEditor.addEventListener('scroll', () => {{
-            lineCounter.scrollTop = codeEditor.scrollTop;
-        }});
-
-        codeEditor.addEventListener('input', updateLines);
-                
-        // Handle Tab key indenting natively
-        codeEditor.addEventListener('keydown', (e) => {{
-            if (e.key === 'Tab') {{
-                e.preventDefault();
-                const start = codeEditor.selectionStart;
-                const end = codeEditor.selectionEnd;
-                codeEditor.value = codeEditor.value.substring(0, start) + "    " + codeEditor.value.substring(end);
-                codeEditor.selectionStart = codeEditor.selectionEnd = start + 4;
-                updateLines();
-            }}
-        }});
-
-        // Passing text straight to the parent window url queries
-        runBtn.addEventListener('click', () => {{
-            const codeContent = encodeURIComponent(codeEditor.value);
-            window.parent.postMessage({{
-                type: 'streamlit:setComponentValue',
-                value: codeEditor.value
-            }}, '*');
-                        
-            // Append to parent parameters directly
-            const url = new URL(window.parent.location.href);
-            url.searchParams.set('submitted_code', codeEditor.value);
-            window.parent.location.href = url.href;
-        }});
-
-        updateLines();
-    </script>
-    """
-        
-    # Render the native web container component safely
-    editor_response = st.components.v1.html(custom_editor_html, height=360, scrolling=False)
+    
+    # Render code typing block
+    code_input = st.text_area(
+        label="Editor Window",
+        value=st.session_state.user_code,
+        height=300,
+        label_visibility="collapsed"
+    )
+    
+    # Process actions without risky window redirect loops
+    if st.button("🚀 Run & Compile Code", type="primary"):
+        st.session_state.user_code = code_input
+        st.session_state.execution_success = True
 
 with col_right:
     st.subheader("🧪 Live Output Testing")
-        
-    # Process script parameters directly whenever data updates
-    if st.session_state.user_code_string:
+    
+    if st.session_state.execution_success:
         output_buffer = io.StringIO()
+        old_stdout = sys.stdout
         sys.stdout = output_buffer
         current_env = {}
-                
+        
         try:
-            exec(st.session_state.user_code_string, current_env)
-                        
-            found_funcs = [
+            # Safely compile the script context
+            exec(st.session_state.user_code, current_env)
+            sys.stdout = old_stdout
+            
+            # Dynamically identify the encryption function inside the user code
+            callable_functions = [
                 name for name, obj in current_env.items() 
-                if inspect.isfunction(obj) and not name.startswith('__')
+                if callable(obj) and not name.startswith('__')
             ]
-                        
-            sys.stdout = sys.__stdout__
-            st.session_state.exec_env = current_env
-            st.session_state.detected_functions = found_funcs
+            
+            if callable_functions:
+                target_func_name = callable_functions[0]
+                target_func = current_env[target_func_name]
+                
+                st.success(f"🎉 Active function ready: `{target_func_name}()`")
+                st.write("---")
+                
+                # --- THE RIGHT PANEL: Generate message box and display encrypted result ---
+                with st.form(key="encryption_testing_form"):
+                    test_input = st.text_input("Enter text to pass into your function:", value="hello world")
+                    submit_action = st.form_submit_button("Encrypt Message")
                     
+                    if submit_action or test_input:
+                        try:
+                            # Pass user input through the function compiled live
+                            live_result = target_func(test_input)
+                            st.write("**Function Output:**")
+                            st.info(f"`{live_result}`")
+                        except Exception as run_err:
+                            st.error(f"Error running `{target_func_name}`: {run_err}")
+            else:
+                st.warning("Code executed, but no function definition was found. Please define a function (e.g., `def my_function():`).")
+                
         except Exception as e:
-            sys.stdout = sys.__stdout__
+            sys.stdout = old_stdout
             st.error("❌ Python Execution Error:")
             st.code(traceback.format_exc(), language="python")
-
-    # --- LIVE TESTING INTERACTION ZONE ---
-    if st.session_state.detected_functions:
-        # FIX: Extract the first single string from the list instead of passing the whole list
-        target_func_name = st.session_state.detected_functions
-        target_func = st.session_state.exec_env[target_func_name]
-                
-        st.success(f"🎉 Active function ready: `{target_func_name}()`")
-        st.write("---")
-                
-        test_input = st.text_input("Enter text to pass into your function:", value="hello world")
-                
-        try:
-            live_result = target_func(test_input)
-            st.write("**Function Output:**")
-            st.info(f"`{live_result}`")
-        except Exception as e:
-            st.error(f"Error running `{target_func_name}`: {e}")
     else:
         st.caption("Awaiting successful function build from the left panel...")
