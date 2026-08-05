@@ -1,6 +1,37 @@
+import streamlit as st
+import sys
+import io
+import traceback
+import inspect
+
+st.set_page_config(
+    page_title="Single Box Editor Sandbox",
+    page_icon="🐍",
+    layout="wide"
+)
+
+st.title("🐍 Single Box Python Editor Sandbox")
+st.markdown("Type code inside the single window below. Line numbers are fully integrated, and code runs instantly without copy-pasting!")
+
+# Default starter code template
+default_code = """def caesar_shift3(message):
+    table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "DEFGHIJKLMNOPQRSTUVWXYZABC")
+    return message.translate(table)"""
+
+# Persistent memory states
+if "user_code_string" not in st.session_state:
+    st.session_state.user_code_string = default_code
+if "exec_env" not in st.session_state:
+    st.session_state.exec_env = {}
+if "detected_functions" not in st.session_state:
+    st.session_state.detected_functions = []
+
+col_left, col_right = st.columns(2)
+
 with col_left:
     st.subheader("📝 Integrated Code Box")
-         
+        
+    # THE SINGLE-BOX EDITOR ENGINE: Unified code area with auto-compile broadcasting
     custom_editor_html = f"""
     <div style="font-family: monospace; position: relative; border: 1px solid #444; border-radius: 4px; background: #1e1e1e; padding: 0; display: flex; height: 300px;">
         <!-- Left Side Gutter Line Numbers -->
@@ -10,7 +41,7 @@ with col_left:
             font-family: inherit; font-size: 14px; line-height: 20px; font-weight: bold;
             border-right: 1px solid #444; user-select: none; pointer-events: none; box-sizing: border-box;
         ">1</textarea>
-                 
+                
         <!-- Right Side Typing Editor Area -->
         <textarea id="codeEditor" placeholder="Write your Python script here..." wrap="off" style="
             flex: 1; height: 100%; border: none; background: #1e1e1e; color: #fff; 
@@ -18,7 +49,7 @@ with col_left:
             outline: none; tab-size: 4; box-sizing: border-box; overflow-x: auto;
         ">{st.session_state.user_code_string}</textarea>
     </div>
-         
+        
     <!-- Unified Run Button inside the theme wrapper -->
     <button id="runBtn" style="
         margin-top: 15px; background-color: #ff4b4b; color: white; border: none; 
@@ -41,12 +72,14 @@ with col_left:
             lineCounter.scrollTop = codeEditor.scrollTop;
         }}
 
+        // Keep scrolling sync active
         codeEditor.addEventListener('scroll', () => {{
             lineCounter.scrollTop = codeEditor.scrollTop;
         }});
 
         codeEditor.addEventListener('input', updateLines);
-                 
+                
+        // Handle Tab key indenting natively
         codeEditor.addEventListener('keydown', (e) => {{
             if (e.key === 'Tab') {{
                 e.preventDefault();
@@ -58,23 +91,66 @@ with col_left:
             }}
         }});
 
-        // FIXED: Streamlit uses Streamlit.setComponentValue via messaging protocol
+        // Safe component value communication with Streamlit
         runBtn.addEventListener('click', () => {{
             window.parent.postMessage({{
-                isStreamlitMessage: true,
-                type: "streamlit:setComponentValue",
+                type: 'streamlit:setComponentValue',
                 value: codeEditor.value
-            }}, "*");
+            }}, '*');
         }});
 
         updateLines();
     </script>
     """
-         
-    # Capture the return value from the HTML component
+        
+    # Render the native web container component safely and capture its state return value
     editor_response = st.components.v1.html(custom_editor_html, height=360, scrolling=False)
-
-    # FIXED: Update session state if the component sent back new text
+    
+    # Catch data returned by the component message value link
     if editor_response is not None:
         st.session_state.user_code_string = editor_response
-        st.rerun()
+
+with col_right:
+    st.subheader("🧪 Live Output Testing")
+        
+    # Process script parameters directly whenever data updates
+    if st.session_state.user_code_string:
+        output_buffer = io.StringIO()
+        sys.stdout = output_buffer
+        current_env = {}
+                
+        try:
+            exec(st.session_state.user_code_string, current_env)
+                        
+            found_funcs = [
+                name for name, obj in current_env.items() 
+                if inspect.isfunction(obj) and not name.startswith('__')
+            ]
+                        
+            sys.stdout = sys.__stdout__
+            st.session_state.exec_env = current_env
+            st.session_state.detected_functions = found_funcs
+                    
+        except Exception as e:
+            sys.stdout = sys.__stdout__
+            st.error("❌ Python Execution Error:")
+            st.code(traceback.format_exc(), language="python")
+
+    # --- LIVE TESTING INTERACTION ZONE ---
+    if st.session_state.detected_functions:
+        target_func_name = st.session_state.detected_functions[0]
+        target_func = st.session_state.exec_env[target_func_name]
+                
+        st.success(f"🎉 Active function ready: `{target_func_name}()`")
+        st.write("---")
+                
+        test_input = st.text_input("Enter text to pass into your function:", value="hello world")
+                
+        try:
+            live_result = target_func(test_input)
+            st.write("**Function Output:**")
+            st.info(f"`{live_result}`")
+        except Exception as e:
+            st.error(f"Error running `{target_func_name}`: {e}")
+    else:
+        st.caption("Awaiting successful function build from the left panel...")
