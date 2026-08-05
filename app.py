@@ -5,165 +5,122 @@ import traceback
 import inspect
 
 st.set_page_config(
-    page_title="Single Box Editor Sandbox",
+    page_title="Streamlit Python Sandbox",
     page_icon="🐍",
     layout="wide"
 )
 
-st.title("🐍 Single Box Python Editor Sandbox")
-st.markdown("Type code inside the single window below. Line numbers are fully integrated, and code runs instantly without copy-pasting!")
+st.title("🐍 Native Python Editor Sandbox")
+st.markdown("Type any Python code or function on the left, then click the button to execute it and run live tests on the right panel.")
 
-# Default starter code template
+# Default starting code template
 default_code = """def caesar_shift3(message):
     table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "DEFGHIJKLMNOPQRSTUVWXYZABC")
-    return message.translate(table)"""
+    return message.translate(table)
 
-# Persistent memory states
-if "user_code_string" not in st.session_state:
-    st.session_state.user_code_string = default_code
-if "exec_env" not in st.session_state:
-    st.session_state.exec_env = {}
-if "detected_functions" not in st.session_state:
-    st.session_state.detected_functions = []
+# You can also run plain expressions or prints here:
+print("Code template compiled successfully!")
+"""
 
-# --- EXTRACT CODE DATA SUBMITTED FROM THE BROWSER ---
-# Safely pull from parameter state arrays without fracturing browser frames
-query_params = st.query_params
-if "submitted_code" in query_params:
-    st.session_state.user_code_string = query_params["submitted_code"]
+# Track application state across clicks
+if "user_code" not in st.session_state:
+    st.session_state.user_code = default_code
+if "has_run" not in st.session_state:
+    st.session_state.has_run = False
 
-col_left, col_right = st.columns(2)
+col_editor, col_output = st.columns(2)
 
-with col_left:
+with col_editor:
     st.subheader("📝 Integrated Code Box")
+    
+    # Calculate how many lines are currently in the code template
+    num_lines = len(st.session_state.user_code.split("\n"))
+    line_numbers_string = "\n".join(str(i) for i in range(1, num_lines + 1))
+    
+    # Visual Layout: Align line numbers directly next to the code text area
+    gutter, textarea = st.columns([1, 15])
+    
+    with gutter:
+        # Static tracking box displaying line integers cleanly
+        st.text_area(
+            label="Lines",
+            value=line_numbers_string,
+            height=300,
+            disabled=True,
+            label_visibility="collapsed"
+        )
         
-    # THE SINGLE-BOX EDITOR ENGINE: Unified code area with auto-compile broadcasting
-    custom_editor_html = f"""
-    <div style="font-family: monospace; position: relative; border: 1px solid #444; border-radius: 4px; background: #1e1e1e; padding: 0; display: flex; height: 300px;">
-        <!-- Left Side Gutter Line Numbers -->
-        <textarea id="lineCounter" readonly style="
-            width: 35px; height: 100%; border: none; background: #1e1e1e; color: #888; 
-            text-align: right; padding: 10px 5px; resize: none; overflow-y: hidden; 
-            font-family: inherit; font-size: 14px; line-height: 20px; font-weight: bold;
-            border-right: 1px solid #444; user-select: none; pointer-events: none; box-sizing: border-box;
-        ">1</textarea>
-                
-        <!-- Right Side Typing Editor Area -->
-        <textarea id="codeEditor" placeholder="Write your Python script here..." wrap="off" style="
-            flex: 1; height: 100%; border: none; background: #1e1e1e; color: #fff; 
-            padding: 10px; resize: none; font-family: inherit; font-size: 14px; line-height: 20px;
-            outline: none; tab-size: 4; box-sizing: border-box; overflow-x: auto;
-        ">{st.session_state.user_code_string}</textarea>
-    </div>
-        
-    <!-- Unified Run Button inside the theme wrapper -->
-    <button id="runBtn" style="
-        margin-top: 15px; background-color: #ff4b4b; color: white; border: none; 
-        padding: 8px 16px; font-size: 14px; border-radius: 4px; cursor: pointer; font-family: sans-serif;
-    ">🚀 Run & Compile Code</button>
+    with textarea:
+        # Main input editor window where the user types
+        code_input = st.text_area(
+            label="Python Code Editor Input",
+            value=st.session_state.user_code,
+            height=300,
+            label_visibility="collapsed"
+        )
+    
+    # Trigger execution update
+    if st.button("🚀 Run & Compile Code", type="primary"):
+        st.session_state.user_code = code_input
+        st.session_state.has_run = True
+        st.rerun()
 
-    <script>
-        const codeEditor = document.getElementById('codeEditor');
-        const lineCounter = document.getElementById('lineCounter');
-        const runBtn = document.getElementById('runBtn');
-
-        function updateLines() {{
-            const lines = codeEditor.value.split('\\n');
-            const lineCount = lines.length;
-            let lineNumbers = '';
-            for (let i = 1; i <= lineCount; i++) {{
-                lineNumbers += i + '\\n';
-            }}
-            lineCounter.value = lineNumbers;
-            lineCounter.scrollTop = codeEditor.scrollTop;
-        }}
-
-        // Keep scrolling sync active
-        codeEditor.addEventListener('scroll', () => {{
-            lineCounter.scrollTop = codeEditor.scrollTop;
-        }});
-
-        codeEditor.addEventListener('input', updateLines);
-                
-        // Handle Tab key indenting natively
-        codeEditor.addEventListener('keydown', (e) => {{
-            if (e.key === 'Tab') {{
-                e.preventDefault();
-                const start = codeEditor.selectionStart;
-                const end = codeEditor.selectionEnd;
-                codeEditor.value = codeEditor.value.substring(0, start) + "    " + codeEditor.value.substring(end);
-                codeEditor.selectionStart = codeEditor.selectionEnd = start + 4;
-                updateLines();
-            }}
-        }});
-
-        // Broadcast code directly into Streamlit state parameters
-        runBtn.addEventListener('click', () => {{
-            const codeContent = encodeURIComponent(codeEditor.value);
-            window.parent.postMessage({{
-                type: 'streamlit:setComponentValue',
-                value: codeEditor.value
-            }}, '*');
-                        
-            // FIXED: Using standard search parameter updating to prevent loop context wipeouts
-            const url = new URL(window.parent.location.href);
-            url.searchParams.set('submitted_code', codeEditor.value);
-            window.parent.history.pushState({{}}, '', url.href);
-            window.parent.location.reload();
-        }});
-
-        updateLines();
-    </script>
-    """
-        
-    # Render the native web container component safely
-    editor_response = st.components.v1.html(custom_editor_html, height=360, scrolling=False)
-
-with col_right:
+with col_output:
     st.subheader("🧪 Live Output Testing")
-        
-    # Process script parameters directly whenever data updates
-    if st.session_state.user_code_string:
+    
+    if st.session_state.has_run:
         output_buffer = io.StringIO()
         old_stdout = sys.stdout
         sys.stdout = output_buffer
         current_env = {}
-                
+        
         try:
-            exec(st.session_state.user_code_string, current_env)
-                        
-            found_funcs = [
-                name for name, obj in current_env.items() 
+            # Safely compile whatever functions or statements the user provided
+            exec(st.session_state.user_code, current_env)
+            
+            # Restore stdout standard stream mapping
+            sys.stdout = old_stdout
+            printed_logs = output_buffer.getvalue()
+            
+            st.success("🎉 Code compiled successfully!")
+            
+            # Display print logs if present
+            if printed_logs.strip():
+                st.write("**Console Output (stdout):**")
+                st.code(printed_logs, language="plaintext")
+            
+            # Look for executable user-defined functions inside the environment
+            found_functions = [
+                name for name, obj in current_env.items()
                 if inspect.isfunction(obj) and not name.startswith('__')
             ]
+            
+            if found_functions:
+                st.write("---")
+                st.markdown("### 📥 Interactive Function Tester")
+                
+                # Pick the primary custom function found
+                target_name = found_functions[0]
+                target_func = current_env[target_name]
+                
+                st.caption(f"Testing active function: `{target_name}()`")
+                
+                # Dynamic text area generated right here for entering arguments
+                test_message = st.text_input("Enter text to pass as a message argument:", value="hello world")
+                
+                if test_message:
+                    try:
+                        # Feed the live text input directly into the user's function
+                        result = target_func(test_message)
+                        st.markdown("**Function Result Output:**")
+                        st.info(f"`{result}`")
+                    except Exception as func_err:
+                        st.error(f"Execution error inside `{target_name}`: {func_err}")
                         
-            sys.stdout = sys.__stdout__
-            st.session_state.exec_env = current_env
-            st.session_state.detected_functions = found_funcs
-                    
         except Exception as e:
-            sys.stdout = sys.__stdout__
-            st.error("❌ Python Execution Error:")
+            # Revert stream output safely during a compilation failure
+            sys.stdout = old_stdout
+            st.error("❌ Python Execution/Syntax Error:")
             st.code(traceback.format_exc(), language="python")
-
-    # --- LIVE TESTING INTERACTION ZONE ---
-    if st.session_state.detected_functions:
-        # FIXED: Safeguarded list mapping index selection for single function extraction
-        target_func_name = st.session_state.detected_functions[0] if isinstance(st.session_state.detected_functions, list) else st.session_state.detected_functions
-        target_func = st.session_state.exec_env[target_func_name]
-                
-        st.success(f"🎉 Active function ready: `{target_func_name}()`")
-        st.write("---")
-                
-        # The secondary interactive message text input box
-        test_input = st.text_input("Enter text to pass into your function:", value="hello world")
-                
-        try:
-            # Executes the live loaded custom string function block
-            live_result = target_func(test_input)
-            st.write("**Function Output:**")
-            st.info(f"`{live_result}`")
-        except Exception as e:
-            st.error(f"Error running `{target_func_name}`: {e}")
     else:
-        st.caption("Awaiting successful function build from the left panel...")
+        st.caption("Awaiting successful code execution from the left panel...")
