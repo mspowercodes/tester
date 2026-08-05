@@ -8,43 +8,43 @@ import sys
 st.set_page_config(page_title="Function Tester Sandbox", layout="wide", page_icon="💻")
 st.title("💻 Live Function Validator & Tester")
 
-# Pre-populated script example for the classroom
 starter_code = """def caesar_shift3(message):
     table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "defghijklmnopqrstuvwxyzabc")
     return message.translate(table)
 """
 
-# Main visual split
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("📝 1. Write Your Python Function")
     
-    # --- FIXED VISUAL LINE NUMBER LAYOUT ---
-    # [0.1, 1.9] sets relative widths so line numbers stay compactly on the left
-    num_col, code_col = st.columns([0.1, 1.9])
-    
-    with num_col:
-        # Generates vertical numbers from 1 to 20 to guide the students visually
-        st.markdown(
-            "<div style='text-align: right; color: gray; font-family: monospace; line-height: 2.15; padding-top: 27px; font-size: 14px;'>" + 
-            "<br>".join(str(i) for i in range(1, 21)) + 
-            "</div>", 
-            unsafe_allow_html=True
-        )
+    # CRITICAL FIX: The form stops Streamlit from rerunning on every keystroke
+    with st.form("code_form"):
+        num_col, code_col = st.columns([0.1, 1.9])
         
-    with code_col:
-        user_code = st.text_area(
-            "Python Code Editor:", 
-            value=starter_code, 
-            height=465, 
-            label_visibility="collapsed" # Hides duplicate text headers to save space
-        )
+        with num_col:
+            st.markdown(
+                "<div style='text-align: right; color: gray; font-family: monospace; line-height: 2.15; padding-top: 5px; font-size: 14px;'>" + 
+                "<br>".join(str(i) for i in range(1, 21)) + 
+                "</div>", 
+                unsafe_allow_html=True
+            )
+            
+        with code_col:
+            user_code = st.text_area(
+                "Python Code Editor:", 
+                value=starter_code, 
+                height=465, 
+                label_visibility="collapsed"
+            )
+            
+        # The form submit button locks the text area data safely
+        submit_code = st.form_submit_button("🔒 Lock Code Changes", type="secondary", use_container_width=True)
 
 with col2:
     st.subheader("⚙️ 2. Dynamic Test Inputs")
     
-    # Clean string search for the student's custom named function
+    # Process the regex search safely now that user_code won't change mid-type
     match = re.search(r"def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(", user_code)
     detected_function = match.group(1) if match else "caesar_shift3"
     st.info(f"🔄 Detected Function Name: `{detected_function}`")
@@ -56,11 +56,9 @@ with col2:
     st.subheader("🖥️ 3. Live Encrypted Output")
 
     if run_button:
-        # Generate temporary files cleanly to avoid deep operating system blocks
         temp_file = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
         temp_path = temp_file.name
         
-        # Test harness injected strictly beneath their workspace logic
         harness_logic = f"""
 import sys
 try:
@@ -74,10 +72,9 @@ except Exception as e:
 """
         full_executable_script = user_code + "\n" + harness_logic
         temp_file.write(full_executable_script.encode('utf-8'))
-        temp_file.close()  # Immediately free up the system thread file handle
+        temp_file.close()  
 
         try:
-            # Safely pass execution task straight to isolated process layer
             process = subprocess.run(
                 [sys.executable, temp_path],
                 capture_output=True,
