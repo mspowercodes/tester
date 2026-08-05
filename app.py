@@ -2,91 +2,87 @@ import streamlit as st
 import sys
 import io
 import traceback
-import ast
 import inspect
+import pandas as pd
 
 st.set_page_config(
-    page_title="Line Number Python Sandbox",
+    page_title="Line-Numbered Sandbox",
     page_icon="⚡",
     layout="wide"
 )
 
-st.title("⚡ Python Sandbox with Line Numbers")
-st.markdown("Type your function layout below. Line labels update down the left column automatically.")
+st.title("⚡ Python Sandbox with True Line Numbers")
+st.markdown("Double-click any row to edit or add code lines. Use the **[ + ]** button at the bottom of the grid to add new lines!")
 
-# Clean template code structure
-default_code = """def caesar_shift3(message):
-    table = str.maketrans("abcdefghijklmnopqrstuvwxyz", "DEFGHIJKLMNOPQRSTUVWXYZABC")
-    return message.translate(table)
-"""
+# 1. Provide a starter script broken down by line rows
+if "code_rows" not in st.session_state:
+    st.session_state.code_rows = [
+        "def caesar_shift3(message):",
+        "    table = str.maketrans('abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZABC')",
+        "    return message.translate(table)"
+    ]
 
-# Establish global track state
-if "code_text" not in st.session_state:
-    st.session_state.code_text = default_code
 if "exec_env" not in st.session_state:
     st.session_state.exec_env = {}
 if "detected_functions" not in st.session_state:
     st.session_state.detected_functions = []
 
-# --- MULTI-COLUMN DESIGN FOR LINE NUMBERS ---
-# col_nums provides a thin left margin for the numbers, col_input holds the text box
-col_nums, col_input, col_testing = st.columns([1, 12, 12])
+col1, col2 = st.columns(2)
 
-with col_nums:
-    st.markdown("<br><br>", unsafe_allowed_html=True)  # Align numbers downward with text area header
+with col1:
+    st.subheader("Input Python Script")
     
-    # Calculate how many total lines are currently typed in the state
-    total_lines = len(st.session_state.code_text.split('\n'))
+    # Format current rows into a clean Pandas DataFrame for the grid editor
+    df = pd.DataFrame({"Python Code": st.session_state.code_rows})
+    df.index = df.index + 1  # Force line numbers to start at 1 instead of 0
     
-    # Format the line numbers vertically
-    numbers_html = "".join([f"<div style='line-height: 25px; color: #888; font-family: monospace; text-align: right; padding-right: 5px;'>{i}</div>" for i in range(1, max(total_lines + 1, 10))])
-    st.markdown(numbers_html, unsafe_allowed_html=True)
+    # Render the interactive data editor grid
+    edited_df = st.data_editor(
+        df,
+        use_container_width=True,
+        num_rows="dynamic",  # Allows users to add or delete rows live
+        column_config={
+            "Python Code": st.column_config.TextColumn(
+                "Python Code (Edit lines below)",
+                width="large",
+                required=True
+            )
+        }
+    )
+    
+    # Reassemble the individual table grid rows back into a single Python script block
+    user_code = "\n".join(edited_df["Python Code"].tolist())
+    
+    # Save current lines to session state so they don't erase on page updates
+    st.session_state.code_rows = edited_df["Python Code"].tolist()
 
-with col_input:
-    with st.form(key="code_form"):
-        # The text input text area
-        user_code = st.text_area(
-            label="Your Python Script:",
-            value=st.session_state.code_text,
-            height=300,
-            key="sandbox_editor"
-        )
-        submit_button = st.form_submit_button(label="🚀 Activate My Function")
-        
-        # Save modifications dynamically to recalculate numbers if lines change
-        if user_code != st.session_state.code_text:
-            st.session_state.code_text = user_code
-
-with col_testing:
+with col2:
     st.subheader("Live Output Testing")
     
-    if submit_button:
+    # Automatically execute and monitor whenever lines in the data editor update
+    if user_code.strip():
         output_buffer = io.StringIO()
         sys.stdout = output_buffer
         current_env = {}
         
         try:
-            # Safely evaluate script blocks
             exec(user_code, current_env)
             
-            # Extract valid user functions
             found_funcs = [
                 name for name, obj in current_env.items() 
                 if inspect.isfunction(obj) and not name.startswith('__')
             ]
             
             sys.stdout = sys.__stdout__
-            
-            # Push variables into long term context states
             st.session_state.exec_env = current_env
             st.session_state.detected_functions = found_funcs
             
         except Exception as e:
             sys.stdout = sys.__stdout__
-            st.error("❌ Python Execution Error:")
+            st.error("❌ Python Syntax Error on Input:")
             st.code(traceback.format_exc(), language="python")
 
-    # --- LIVE TESTING INTERACTION ZONE ---
+    # --- LIVE INTERACTION ZONE ---
     if st.session_state.detected_functions:
         target_func_name = st.session_state.detected_functions[0]
         target_func = st.session_state.exec_env[target_func_name]
