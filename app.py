@@ -2,25 +2,24 @@ import streamlit as st
 import sys
 import io
 import traceback
-import ast
 
 st.set_page_config(
-    page_title="Auto-Print Python Executor",
-    page_icon="🤖",
+    page_title="Instant Python Output",
+    page_icon="⚡",
     layout="wide"
 )
 
-st.title("🤖 Auto-Print Python Script Runner")
-st.markdown("Type your code below. The final calculation or variable will display automatically without typing `print()`.")
+st.title("⚡ Instant Auto-Print Python Runner")
+st.markdown("Type any Python script here. All results and created variables will display automatically below.")
 
-# Default starter code showing that raw calculations display instantly
-default_code = """# Define variables or functions normally
-subtotal = 50
-tax_rate = 0.08
-total_cost = subtotal * (1 + tax_rate)
+# Standard default code
+default_code = """# Write your calculations, functions, or variables below
+secret_message = "hello world"
+shifted_amount = 3
 
-# Just type the variable or calculation on the last line to see it!
-total_cost"""
+# Math equations evaluate automatically
+50 * 3
+"""
 
 col1, col2 = st.columns(2)
 
@@ -28,65 +27,86 @@ with col1:
     st.subheader("Input Python Script")
     with st.form(key="code_form"):
         user_code = st.text_area(
-            label="Write or paste your code here:",
+            label="Your Python Script:",
             value=default_code,
-            height=400
+            height=350
         )
         submit_button = st.form_submit_button(label="▶ Run Script")
 
 with col2:
-    st.subheader("Output")
+    st.subheader("Output View")
     
     if submit_button:
-        # Clear/setup standard text buffer for any standard print statements used
+        # 1. Setup execution tracking environment
         output_buffer = io.StringIO()
         sys.stdout = output_buffer
         
-        # Persistent global environment for this specific run
+        # Isolate the user workspace dictionary
         exec_globals = {}
         
         try:
-            # 1. Parse the user's code into an Abstract Syntax Tree (AST)
-            cleaned_code = user_code.strip()
-            tree = ast.parse(cleaned_code)
+            # Clean up trailing spaces and break the script down by line entries
+            raw_lines = user_code.strip().split('\n')
+            clean_lines = [line for line in raw_lines if line.strip() and not line.strip().startswith('#')]
             
-            # 2. Check if the very last line of code is a raw expression (like a variable or math)
-            if tree.body and isinstance(tree.body[-1], ast.Expr):
-                # Isolate the final line expression
-                last_expr = tree.body.pop()
+            if clean_lines:
+                # Group all configuration setup lines together
+                setup_block = '\n'.join(clean_lines[:-1])
+                last_active_line = clean_lines[-1].strip()
                 
-                # Compile and execute all lines leading up to the final expression
-                if tree.body:
-                    exec(compile(tree, filename="<ast>", mode="exec"), exec_globals)
+                # Execute all background code lines first
+                if setup_block:
+                    exec(setup_block, exec_globals)
                 
-                # Compile and explicitly evaluate the final line to extract its value
-                expr_mode = ast.Expression(last_expr.value)
-                final_result = eval(compile(expr_mode, filename="<ast>", mode="eval"), exec_globals)
+                # Try evaluating the final active line as a raw math equation/expression
+                try:
+                    final_eval = eval(last_active_line, exec_globals)
+                except Exception:
+                    # If it's a structural assignment line instead (like x = 5), run it as a statement
+                    exec(last_active_line, exec_globals)
+                    final_eval = None
             else:
-                # If the last line is a statement (like a loop or function definition), execute normally
-                exec(compile(tree, filename="<ast>", mode="exec"), exec_globals)
-                final_result = None
-            
-            # 3. Restore standard system console output
+                final_eval = None
+
+            # 2. Revert back the system console default state
             sys.stdout = sys.__stdout__
-            captured_printed_output = output_buffer.getvalue()
+            console_prints = output_buffer.getvalue()
             
-            # 4. Display results to user
-            # Show standard prints if they exist
-            if captured_printed_output.strip():
-                st.code(captured_printed_output, language="text")
+            # 3. AUTO-PRINT LOGIC: Display everything found to the screen
+            has_displayed_content = False
             
-            # Automatically show the final un-printed evaluation result
-            if final_result is not None:
-                st.metric(label="Evaluated Result:", value=str(final_result))
-            elif not captured_printed_output.strip():
-                st.info("Script executed successfully, but returned no value.")
+            # Display explicitly typed print() commands if present
+            if console_prints.strip():
+                st.write("**Console Output:**")
+                st.code(console_prints, language="text")
+                has_displayed_content = True
+                
+            # Display raw evaluations (e.g. 50 * 3 or variable reads)
+            if final_eval is not None:
+                st.success(f"**Result:** `{final_eval}`")
+                has_displayed_content = True
+                
+            # Automatically find and display any new variables created by the user
+            user_variables = {
+                k: v for k, v in exec_globals.items() 
+                if k != '__builtins__' and not k.startswith('__')
+            }
+            
+            if user_variables:
+                st.write("**Created Variables:**")
+                for name, val in user_variables.items():
+                    st.info(f"👉 `{name}` = `{val}`")
+                has_displayed_content = True
+                
+            # Fallback guard check if they left absolutely everything blank
+            if not has_displayed_content:
+                st.warning("⚠️ Script ran fine, but found no text, expressions, or variables to display.")
                 
         except Exception as e:
-            # Emergency safety reset for system console
+            # Safely restore console layout during runtime execution errors
             sys.stdout = sys.__stdout__
             error_msg = traceback.format_exc()
-            st.error("❌ Execution Error:")
+            st.error("❌ Python Execution Error:")
             st.code(error_msg, language="python")
     else:
         st.caption("Waiting for script execution...")
