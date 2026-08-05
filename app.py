@@ -33,8 +33,8 @@ col_left_panel, col_right_panel = st.columns(2)
 with col_left_panel:
     st.subheader("Input Python Script")
     
-    # 1. FIX: Pass weights [1, 25] to make the numbers fit perfectly on the left side
-    col_numbers, col_textarea = st.columns([1, 25])
+    # 1. FIXED SYNTAX: Explicit weights [1, 19] align the number column correctly
+    col_numbers, col_textarea = st.columns([1, 19])
     
     with col_numbers:
         # Pushes the numbers down slightly so they match up perfectly with line 1 of the typing box
