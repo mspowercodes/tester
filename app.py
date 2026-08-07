@@ -56,7 +56,7 @@ except Exception:
     app_url = None
 if not app_url:
     app_url = os.environ.get("STREAMLIT_APP_URL")
-
+/*
 user_debug_result = None
 if app_url:
     # Build absolute URL safely
@@ -83,7 +83,7 @@ else:
 st.write("SERVER DEBUG: engine_activated =", st.session_state.engine_activated)
 st.write("SERVER DEBUG: raw_code length =", len(raw_code_input or ""))
 st.write("SERVER DEBUG: server-side user debug length:", len(user_debug_result or ""))
-
+*/
 # Prepare JSON-safe injection values
 safe_code_json = json.dumps(raw_code_input or "")
 js_flag_json = json.dumps(bool(st.session_state.engine_activated))
