@@ -84,11 +84,11 @@ if not app_url:
 # st.write("SERVER DEBUG: raw_code length =", len(raw_code_input or ""))
 # st.write("SERVER DEBUG: server-side user debug length:", len(user_debug_result or ""))
 
-# Prepare JSON-safe injection values
-safe_code_json = json.dumps(raw_code_input or "")
-js_flag_json = json.dumps(bool(st.session_state.engine_activated))
-# Inject server-side debug as JSON string so client can display it via textContent (no HTML injection)
-server_user_debug_json = json.dumps(user_debug_result)
+# # Prepare JSON-safe injection values
+# safe_code_json = json.dumps(raw_code_input or "")
+# js_flag_json = json.dumps(bool(st.session_state.engine_activated))
+# # Inject server-side debug as JSON string so client can display it via textContent (no HTML injection)
+# server_user_debug_json = json.dumps(user_debug_result)
 
 # Simple test HTML (should always appear if components.html works)
 simple_test_html = """
