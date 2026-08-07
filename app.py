@@ -2,8 +2,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(layout="wide")
-st.title("🔐 Interactive Coding Cipher Machine (DEBUG)")
-st.caption("This version includes extra diagnostics for iframe and JS errors.")
+st.title("🔐 Interactive Coding Cipher Machine (Fixed import)")
+st.caption("This version uses dynamic import for Pyodide to avoid srcdoc/module parsing issues.")
 
 # Starter code
 default_starter_code = """def caesar_shift3(message):
@@ -43,13 +43,13 @@ simple_test_html = """
   <strong>Simple test component</strong>
   <div id="simple-test">If you see this, components.html is rendering basic HTML.</div>
   <script>
-    // Ensure console message
     console.log("simple_test_html loaded");
   </script>
 </div>
 """
 
 # Complex interactive HTML template (placeholders __JS_FLAG__ and __SAFE_CODE__)
+# NOTE: script is now a plain <script> and we do a dynamic import inside the async boot() function.
 complex_html_template = """
 <!DOCTYPE html>
 <html>
@@ -76,7 +76,7 @@ complex_html_template = """
     <div id="output-box">Your encrypted message will populate here.</div>
   </div>
 
-  <script type="module">
+  <script>
     // Global error capture so we can display runtime issues inside the notice-zone
     window.addEventListener('error', function (ev) {
       try {
@@ -97,11 +97,11 @@ complex_html_template = """
       } catch(e){}
     });
 
-    // Try/catch around main boot logic so any thrown error is captured and printed
     (async function boot() {
       try {
-        // Import Pyodide (module entry point)
-        import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.mjs";
+        // Dynamic import of the pyodide module (avoids static `import { ... } from` in srcdoc)
+        const module = await import("https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.mjs");
+        const loadPyodide = module.loadPyodide;
 
         const isUnlocked = __JS_FLAG__;
         const rawStudentCode = `__SAFE_CODE__`;
@@ -157,59 +157,5 @@ def run_secure():
         fn = local_scope.get(found_function_name)
         if fn is None:
             return '❌ Error: function not available after exec'
-        return '🔒 Encrypted Output (' + str(found_function_name) + '):\\n' + str(fn(test_msg))
-    except Exception as e:
-        return '❌ Python Runtime Error:\\n' + str(e)
-
-run_secure()
-`;
-            const out = await pyEngine.runPythonAsync(orchestration);
-            document.getElementById('output-box').innerText = out;
-            setStatus('🏁 Done');
-          } catch (e) {
-            const n = document.getElementById('notice-zone');
-            const d = document.createElement('div');
-            d.className = 'info';
-            d.innerText = 'Run error: ' + (e && e.message ? e.message : String(e));
-            n.appendChild(d);
-            setStatus('💥 Execution error');
-          } finally {
-            try { pyEngine.globals.delete('student_code'); } catch(e) {}
-            try { pyEngine.globals.delete('test_msg'); } catch(e) {}
-          }
-        }
-
-        document.getElementById('encrypt-btn').addEventListener('click', runStudentCode);
-
-        // show a small success debug line
-        const n = document.getElementById('notice-zone');
-        const ok = document.createElement('div');
-        ok.className = 'info';
-        ok.innerText = 'FRAME INFO: boot completed; event listeners attached.';
-        n.appendChild(ok);
-
-      } catch (err) {
-        // final catch-all
-        try {
-          const n = document.getElementById('notice-zone');
-          const d = document.createElement('div');
-          d.className = 'info';
-          d.innerText = 'BOOT ERROR: ' + (err && err.message ? err.message : String(err));
-          n.appendChild(d);
-        } catch(e){}
-        console.error('BOOT ERROR', err);
-      }
-    })();
-  </script>
-</body>
-</html>
-"""
-
-# Render simple test first (should always render if components work)
-st.write("SERVER DEBUG: rendering simple test HTML below")
-components.html(simple_test_html, height=100)
-
-# Render the complex interactive iframe with placeholders replaced safely
-html_code = complex_html_template.replace("__JS_FLAG__", js_activation_flag).replace("__SAFE_CODE__", safe_code)
-st.write("SERVER DEBUG: rendering complex interactive HTML below")
-components.html(html_code, height=520, scrolling=True)
+        return '🔒 Encrypted Output (' + str`
+
