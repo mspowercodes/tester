@@ -6,6 +6,19 @@ import requests
 import streamlit as st
 import streamlit.components.v1 as components
 
+st.secrets["app_url"] = "https://tester-new.streamlit.app" 
+
+app_url = "https://tester-new.streamlit.app" 
+try:
+    app_url = st.secrets.get("app_url")
+except Exception:
+    app_url = None
+app_url = app_url or os.environ.get("STREAMLIT_APP_URL")
+
+if not app_url:
+    st.warning("STREAMLIT_APP_URL not set. Set st.secrets['app_url'] or STREAMLIT_APP_URL env var.")
+
+
 st.set_page_config(layout="wide")
 st.title("🔐 Interactive Coding Cipher Machine (Server-side debug)")
 st.caption("Server-side fetch of app internals is embedded into the iframe (safe).")
