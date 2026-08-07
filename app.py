@@ -14,6 +14,8 @@ except Exception:
     app_url = None
 app_url = app_url or os.environ.get("STREAMLIT_APP_URL")
 
+st.write("DEBUG: app_url:", app_url)
+
 if not app_url:
     st.warning("STREAMLIT_APP_URL not set. Set st.secrets['app_url'] or STREAMLIT_APP_URL env var.")
 
