@@ -1,5 +1,18 @@
 import streamlit as st
 import streamlit.components.v1 as components
+import os
+import html
+import requests
+
+APP_URL = os.environ.get("STREAMLIT_APP_URL")  # set this to your app domain e.g. https://tester-new.streamlit.app
+user_debug_text = "APP_URL not set"
+if APP_URL:
+    try:
+        r = requests.get(f"{APP_URL}/api/v2/user/details", timeout=3)
+        user_debug_text = f"HTTP {r.status_code}: " + html.escape(r.text[:2000])
+    except Exception as e:
+        user_debug_text = "ERROR: " + html.escape(str(e))
+
 
 st.set_page_config(layout="wide")
 st.title("🔐 Interactive Coding Cipher Machine")
@@ -167,7 +180,8 @@ run_secure()
                     '/api/v2/app/status',
                     '/api/v1/info'
                 ];
-
+                noticeZone.appendChild(user_debug_text);
+/*
                 for (const p of testPaths) {
                     const url = origin + p;
                     try {
@@ -186,6 +200,7 @@ run_secure()
                         noticeZone.appendChild(msg);
                     }
                 }
+                */
             }
 
             // Attach event listener natively to module-bound elements
