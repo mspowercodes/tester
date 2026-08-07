@@ -6,9 +6,8 @@ import requests
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.secrets["app_url"] = "https://tester-new.streamlit.app" 
 
-app_url = "https://tester-new.streamlit.app" 
+app_url = None
 try:
     app_url = st.secrets.get("app_url")
 except Exception:
