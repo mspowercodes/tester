@@ -59,4 +59,4 @@ with col_right:
             /* Dim treatment to visually lock UI elements before execution initiation */
             .locked { opacity: 0.4; pointer-events: none; }
             .info-banner { background-color: #e7f3fe*
-
+"""
