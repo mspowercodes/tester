@@ -1,18 +1,5 @@
 import streamlit as st
 import streamlit.components.v1 as components
-import os
-import html
-import requests
-
-APP_URL = os.environ.get("STREAMLIT_APP_URL")  # set this to your app domain e.g. https://tester-new.streamlit.app
-user_debug_text = "APP_URL not set"
-if APP_URL:
-    try:
-        r = requests.get(f"{APP_URL}/api/v2/user/details", timeout=3)
-        user_debug_text = f"HTTP {r.status_code}: " + html.escape(r.text[:2000])
-    except Exception as e:
-        user_debug_text = "ERROR: " + html.escape(str(e))
-
 
 st.set_page_config(layout="wide")
 st.title("🔐 Interactive Coding Cipher Machine")
@@ -51,7 +38,7 @@ with col_right:
     st.header("2. Test Your Workspace")
     
     # Protect raw student text configurations from breaking Javascript strings
-    # Note: we escape backslashes, backticks and '${' so the embedded JS template/backtick strings are safer.
+    # Escape backslashes, backticks and '${' so the embedded JS template/backtick strings are safer.
     safe_code = raw_code_input.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
 
     # Use a plain triple-quoted string (not an f-string) with placeholders that we replace below.
@@ -71,150 +58,5 @@ with col_right:
             
             /* Dim treatment to visually lock UI elements before execution initiation */
             .locked { opacity: 0.4; pointer-events: none; }
-            .info-banner { background-color: #e7f3fe; border-left: 6px solid #2196F3; padding: 10px; margin-bottom: 15px; border-radius: 4px; font-size: 0.95em; line-height: 1.4; }
-        </style>
-    </head>
-    <body>
-        <div id="notice-zone"></div>
-
-        <div id="interactive-suite" class="locked">
-            <div class="input-group">
-                <label>📩 Enter message to encrypt:</label>
-                <input type="text" id="test-msg" value="hello world">
-                <button id="encrypt-btn">🔒 Encrypt Message</button>
-            </div>
-            
-            <div class="status" id="status">⏳ Instantiating secure browser engine...</div>
-            <div id="output-box">Your encrypted message will populate here.</div>
-        </div>
-
-        <script type="module">
-            // Import Pyodide from the official CDN module entrypoint
-            import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.mjs";
-
-            let pyEngine = null;
-            const isUnlocked = __JS_FLAG__;
-            const rawStudentCode = `__SAFE_CODE__`;
-
-            function checkLockState() {
-                const noticeZone = document.getElementById('notice-zone');
-                const mainSuite = document.getElementById('interactive-suite');
-                
-                if (!isUnlocked) {
-                    noticeZone.innerHTML = '<div class="info-banner">💡 <b>Workspace Inactive:</b> Write or review your function on the left, then click <b>"Run & Test Code"</b> to open the compiler and runtime. This page will automatically enable when you press run.</div>';
-                } else {
-                    noticeZone.innerHTML = '';
-                    mainSuite.classList.remove('locked');
-                    initPyodide();
-                }
-
-                // Kick off a lightweight diagnostic to surface Streamlit API routing issues
-                debugStreamlitApi();
-            }
-
-            async function initPyodide() {
-                try {
-                    pyEngine = await loadPyodide({
-                        indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.1/full/"
-                    });
-                    document.getElementById('status').innerText = "✅ Python Engine Active. Ready to encrypt!";
-                } catch(err) {
-                    document.getElementById('status').innerText = "💥 Engine initialization failed.";
-                    document.getElementById('output-box').innerText = err.message;
-                }
-            }
-
-            async function executeCipher() {
-                if(!pyEngine) {
-                    alert("Please wait for the environment to finish loading.");
-                    return;
-                }
-
-                document.getElementById('status').innerText = "⚡ Executing custom cipher logic...";
-                const userMessage = document.getElementById('test-msg').value;
-                
-                // Escape backslashes and special string arrays inside evaluation wrappers
-                const safeMessage = userMessage.replace(/\\\\/g, '\\\\\\\\').replace(/`/g, '\\\\`').replace(/\\$/g, '\\\\$');
-
-                const orchestrationScript = `
-import ast
-def run_secure():
-    student_code = r\"\"\"${rawStudentCode}\"\"\"
-    test_msg = \"\"\"${safeMessage}\"\"\"
-    try:
-        parsed_ast = ast.parse(student_code)
-        found_function_name = None
-        for node in parsed_ast.body:
-            if isinstance(node, ast.FunctionDef):
-                found_function_name = node.name
-                break
-        if not found_function_name:
-            return '❌ Error: Could not find any function definition (def your_function).'
-        
-        local_scope = {}
-        exec(student_code, {}, local_scope)
-        cipher_func = local_scope[found_function_name]
-        result = cipher_func(test_msg)
-        return '🔒 Encrypted Output (' + str(found_function_name) + '):\\n' + str(result)
-    except Exception as e:
-        return '❌ Python Runtime Error:\\n' + str(e)
-
-run_secure()
-`;
-                try {
-                    let outText = await pyEngine.runPythonAsync(orchestrationScript);
-                    document.getElementById('output-box').innerText = outText;
-                    document.getElementById('status').innerText = "🏁 Execution finished successfully.";
-                } catch (err) {
-                    document.getElementById('output-box').innerText = "❌ Fatal error during run: " + err.message;
-                    document.getElementById('status').innerText = "💥 Crashed.";
-                }
-            }
-
-            // Debug helper: try to fetch Streamlit's user/details endpoint and print the response
-            async function debugStreamlitApi() {
-                const noticeZone = document.getElementById('notice-zone');
-                const origin = window.location.origin;
-                const testPaths = [
-                    '/api/v2/user/details',
-                    '/api/v2/app/status',
-                    '/api/v1/info'
-                ];
-                noticeZone.appendChild(user_debug_text);
-/*
-                for (const p of testPaths) {
-                    const url = origin + p;
-                    try {
-                        const res = await fetch(url, { credentials: 'include' });
-                        const text = await res.text().catch(() => '<<no-body>>');
-                        const msg = document.createElement('div');
-                        msg.style.marginBottom = '8px';
-                        msg.style.fontFamily = 'monospace';
-                        msg.innerText = `DEBUG: GET ${url} -> ${res.status} ${res.statusText}\n${text}`;
-                        noticeZone.appendChild(msg);
-                    } catch (e) {
-                        const msg = document.createElement('div');
-                        msg.style.marginBottom = '8px';
-                        msg.style.fontFamily = 'monospace';
-                        msg.innerText = `DEBUG: GET ${url} -> NETWORK ERROR: ${e.message}`;
-                        noticeZone.appendChild(msg);
-                    }
-                }
-                */
-            }
-
-            // Attach event listener natively to module-bound elements
-            document.getElementById('encrypt-btn').addEventListener('click', executeCipher);
-
-            // Start check boot process immediately
-            checkLockState();
-        </script>
-    </body>
-    </html>
-    """
-
-    # Inject the two dynamic values into the template safely
-    html_code = html_template.replace("__JS_FLAG__", js_activation_flag).replace("__SAFE_CODE__", safe_code)
-
-    # Render the permanent interface component frame
-    components.html(html_code, height=380)
+            .info-banner { background-color: #e7f3fe*
+
