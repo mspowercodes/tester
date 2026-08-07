@@ -1,9 +1,11 @@
+# app.py - copy this whole file into your repo
+import json
 import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(layout="wide")
-st.title("🔐 Interactive Coding Cipher Machine (Fixed import)")
-st.caption("This version uses dynamic import for Pyodide to avoid srcdoc/module parsing issues.")
+st.title("🔐 Interactive Coding Cipher Machine (Stable)")
+st.caption("Write your custom function on the left, click run, and test messages on the right!")
 
 # Starter code
 default_starter_code = """def caesar_shift3(message):
@@ -28,28 +30,27 @@ if "engine_activated" not in st.session_state:
 if run_clicked:
     st.session_state.engine_activated = True
 
-js_activation_flag = "true" if st.session_state.engine_activated else "false"
+# Use boolean for JSON emission
+js_flag_bool = bool(st.session_state.engine_activated)
 
 # Server-side debug info (visible on page)
 st.write("SERVER DEBUG: engine_activated =", st.session_state.engine_activated)
 st.write("SERVER DEBUG: raw_code length =", len(raw_code_input or ""))
 
-# Escape-only the student code for safe insertion into JS template strings
-safe_code = (raw_code_input or "").replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
+# JSON-escape values to inject into the iframe safely
+safe_code_json = json.dumps(raw_code_input or "")
+js_flag_json = json.dumps(js_flag_bool)  # yields true/false (without quotes) in JS
 
 # Simple test HTML (should always appear if components.html works)
 simple_test_html = """
 <div style="padding:10px;border:1px solid #ddd;border-radius:6px;background:#f8f8f8;">
   <strong>Simple test component</strong>
   <div id="simple-test">If you see this, components.html is rendering basic HTML.</div>
-  <script>
-    console.log("simple_test_html loaded");
-  </script>
+  <script>console.log("simple_test_html loaded");</script>
 </div>
 """
 
-# Complex interactive HTML template (placeholders __JS_FLAG__ and __SAFE_CODE__)
-# NOTE: script is now a plain <script> and we do a dynamic import inside the async boot() function.
+# Complex interactive HTML template with placeholders that we'll replace with JSON values
 complex_html_template = """
 <!DOCTYPE html>
 <html>
@@ -61,6 +62,7 @@ complex_html_template = """
     #notice-zone { margin-bottom:10px; }
     #interactive-suite.locked { opacity:0.5; pointer-events:none; }
     #output-box { margin-top:10px; padding:10px; border-radius:6px; border:1px solid #ddd; background:#fff; min-height:60px; white-space:pre-wrap; font-family:monospace; }
+    label { font-weight: bold; }
   </style>
 </head>
 <body>
@@ -77,6 +79,10 @@ complex_html_template = """
   </div>
 
   <script>
+    // Inserted JSON-safe values:
+    const isUnlocked = __JS_FLAG_JSON__;
+    const rawStudentCode = __SAFE_CODE_JSON__;
+
     // Global error capture so we can display runtime issues inside the notice-zone
     window.addEventListener('error', function (ev) {
       try {
@@ -92,70 +98,10 @@ complex_html_template = """
         const n = document.getElementById('notice-zone');
         const d = document.createElement('div');
         d.className = 'info';
-        d.innerText = 'UNHANDLED PROMISE REJECTION: ' + JSON.stringify(ev.reason);
+        try { d.innerText = 'UNHANDLED PROMISE REJECTION: ' + JSON.stringify(ev.reason); } catch(_) { d.innerText = 'UNHANDLED PROMISE REJECTION'; }
         n.appendChild(d);
       } catch(e){}
     });
 
-    (async function boot() {
-      try {
-        // Dynamic import of the pyodide module (avoids static `import { ... } from` in srcdoc)
-        const module = await import("https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.mjs");
-        const loadPyodide = module.loadPyodide;
-
-        const isUnlocked = __JS_FLAG__;
-        const rawStudentCode = `__SAFE_CODE__`;
-
-        function setStatus(s) { const el = document.getElementById('status'); if(el) el.innerText = s; }
-
-        if (!isUnlocked) {
-          const n = document.getElementById('notice-zone');
-          const b = document.createElement('div');
-          b.className = 'info';
-          b.innerText = 'Workspace inactive — click Run & Test Code on the left to unlock.';
-          n.appendChild(b);
-          setStatus('🔒 Locked');
-          return;
-        }
-
-        setStatus('Initializing Pyodide...');
-        let pyEngine = null;
-        try {
-          pyEngine = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.1/full/" });
-          setStatus('✅ Python Engine Active.');
-        } catch(err){
-          const n = document.getElementById('notice-zone');
-          const d = document.createElement('div');
-          d.className = 'info';
-          d.innerText = 'Pyodide init failed: ' + (err && err.message ? err.message : String(err));
-          n.appendChild(d);
-          setStatus('❌ Pyodide init failed');
-          return;
-        }
-
-        async function runStudentCode() {
-          setStatus('⚡ Executing student cipher...');
-          const userMessage = document.getElementById('test-msg').value;
-          try {
-            // pass as globals (avoids injection issues)
-            pyEngine.globals.set('student_code', rawStudentCode);
-            pyEngine.globals.set('test_msg', userMessage);
-            const orchestration = `
-import ast
-def run_secure():
-    try:
-        parsed_ast = ast.parse(student_code)
-        found_function_name = None
-        for node in parsed_ast.body:
-            if isinstance(node, ast.FunctionDef):
-                found_function_name = node.name
-                break
-        if not found_function_name:
-            return '❌ Error: No function definition found.'
-        local_scope = {}
-        exec(student_code, {}, local_scope)
-        fn = local_scope.get(found_function_name)
-        if fn is None:
-            return '❌ Error: function not available after exec'
-        return '🔒 Encrypted Output (' + str`
+    (async function boot
 """
