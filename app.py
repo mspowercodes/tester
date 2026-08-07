@@ -5,8 +5,6 @@ import html as html_escape
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
-from fastapi import FastAPI, Request
-
 
 
 app_url = None
