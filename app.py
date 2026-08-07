@@ -158,4 +158,4 @@ def run_secure():
         if fn is None:
             return '❌ Error: function not available after exec'
         return '🔒 Encrypted Output (' + str`
-
+"""
