@@ -56,34 +56,34 @@ except Exception:
     app_url = None
 if not app_url:
     app_url = os.environ.get("STREAMLIT_APP_URL")
-/*
-user_debug_result = None
-if app_url:
-    # Build absolute URL safely
-    endpoint = "/api/v2/user/details"
-    if app_url.endswith("/"):
-        target = app_url.rstrip("/") + endpoint
-    else:
-        target = app_url + endpoint
-    try:
-        r = requests.get(target, timeout=5)
-        body = r.text or ""
-        # truncate to 4000 chars to avoid huge payloads
-        summary = body[:4000]
-        if r.ok:
-            user_debug_result = f"HTTP {r.status_code} OK. Body (truncated 4k chars):\\n{summary}"
-        else:
-            user_debug_result = f"HTTP {r.status_code} {r.reason}. Body (truncated 4k chars):\\n{summary}"
-    except Exception as e:
-        user_debug_result = f"REQUEST ERROR: {str(e)}"
-else:
-    user_debug_result = "APP URL not configured. Set st.secrets['app_url'] or environment variable STREAMLIT_APP_URL to your app URL (e.g. https://tester-new.streamlit.app) to enable server-side diagnostics."
 
-# Server-side debug info (visible on page)
-st.write("SERVER DEBUG: engine_activated =", st.session_state.engine_activated)
-st.write("SERVER DEBUG: raw_code length =", len(raw_code_input or ""))
-st.write("SERVER DEBUG: server-side user debug length:", len(user_debug_result or ""))
-*/
+# user_debug_result = None
+# if app_url:
+#     # Build absolute URL safely
+#     endpoint = "/api/v2/user/details"
+#     if app_url.endswith("/"):
+#         target = app_url.rstrip("/") + endpoint
+#     else:
+#         target = app_url + endpoint
+#     try:
+#         r = requests.get(target, timeout=5)
+#         body = r.text or ""
+#         # truncate to 4000 chars to avoid huge payloads
+#         summary = body[:4000]
+#         if r.ok:
+#             user_debug_result = f"HTTP {r.status_code} OK. Body (truncated 4k chars):\\n{summary}"
+#         else:
+#             user_debug_result = f"HTTP {r.status_code} {r.reason}. Body (truncated 4k chars):\\n{summary}"
+#     except Exception as e:
+#         user_debug_result = f"REQUEST ERROR: {str(e)}"
+# else:
+#     user_debug_result = "APP URL not configured. Set st.secrets['app_url'] or environment variable STREAMLIT_APP_URL to your app URL (e.g. https://tester-new.streamlit.app) to enable server-side diagnostics."
+
+# # Server-side debug info (visible on page)
+# st.write("SERVER DEBUG: engine_activated =", st.session_state.engine_activated)
+# st.write("SERVER DEBUG: raw_code length =", len(raw_code_input or ""))
+# st.write("SERVER DEBUG: server-side user debug length:", len(user_debug_result or ""))
+
 # Prepare JSON-safe injection values
 safe_code_json = json.dumps(raw_code_input or "")
 js_flag_json = json.dumps(bool(st.session_state.engine_activated))
