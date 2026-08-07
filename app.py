@@ -75,43 +75,46 @@ with col_right:
         </div>
 
         <script type="module">
-            // Import Pyodide directly as an isolated module to bypass browser security policies
-            import {{ loadPyodide }} from "https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.mjs";
+            // Import Pyodide from the official CDN module entrypoint
+            import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.mjs";
 
             let pyEngine = null;
             const isUnlocked = {js_activation_flag};
             const rawStudentCode = `{safe_code}`;
 
-            function checkLockState() {{
+            function checkLockState() {
                 const noticeZone = document.getElementById('notice-zone');
                 const mainSuite = document.getElementById('interactive-suite');
                 
-                if (!isUnlocked) {{
-                    noticeZone.innerHTML = '<div class="info-banner">💡 <b>Workspace Inactive:</b> Write or review your function on the left, then click <b>"Run & Test Code"</b> to open the compiler here.</div>';
-                }} else {{
+                if (!isUnlocked) {
+                    noticeZone.innerHTML = '<div class="info-banner">💡 <b>Workspace Inactive:</b> Write or review your function on the left, then click <b>"Run & Test Code"</b> to open the compiler and runtime. This page will automatically enable when you press run.</div>';
+                } else {
                     noticeZone.innerHTML = '';
                     mainSuite.classList.remove('locked');
                     initPyodide();
-                }}
-            }}
+                }
 
-            async function initPyodide() {{
-                try {{
-                    pyEngine = await loadPyodide({{
+                // Kick off a lightweight diagnostic to surface Streamlit API routing issues
+                debugStreamlitApi();
+            }
+
+            async function initPyodide() {
+                try {
+                    pyEngine = await loadPyodide({
                         indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.1/full/"
-                    }});
+                    });
                     document.getElementById('status').innerText = "✅ Python Engine Active. Ready to encrypt!";
-                }} catch(err) {{
+                } catch(err) {
                     document.getElementById('status').innerText = "💥 Engine initialization failed.";
                     document.getElementById('output-box').innerText = err.message;
-                }}
-            }}
+                }
+            }
 
-            async function executeCipher() {{
-                if(!pyEngine) {{
+            async function executeCipher() {
+                if(!pyEngine) {
                     alert("Please wait for the environment to finish loading.");
                     return;
-                }}
+                }
 
                 document.getElementById('status').innerText = "⚡ Executing custom cipher logic...";
                 const userMessage = document.getElementById('test-msg').value;
@@ -122,8 +125,8 @@ with col_right:
                 const orchestrationScript = `
 import ast
 def run_secure():
-    student_code = r\"\"\"${{rawStudentCode}}\"\"\"
-    test_msg = \"\"\"${{safeMessage}}\"\"\"
+    student_code = r\"\"\"${rawStudentCode}\"\"\"
+    test_msg = \"\"\"${safeMessage}\"\"\"
     try:
         parsed_ast = ast.parse(student_code)
         found_function_name = None
@@ -134,8 +137,8 @@ def run_secure():
         if not found_function_name:
             return '❌ Error: Could not find any function definition (def your_function).'
         
-        local_scope = {{}}
-        exec(student_code, {{}}, local_scope)
+        local_scope = {}
+        exec(student_code, {}, local_scope)
         cipher_func = local_scope[found_function_name]
         result = cipher_func(test_msg)
         return '🔒 Encrypted Output (' + str(found_function_name) + '):\\n' + str(result)
@@ -144,15 +147,45 @@ def run_secure():
 
 run_secure()
 `;
-                try {{
+                try {
                     let outText = await pyEngine.runPythonAsync(orchestrationScript);
                     document.getElementById('output-box').innerText = outText;
                     document.getElementById('status').innerText = "🏁 Execution finished successfully.";
-                }} catch (err) {{
+                } catch (err) {
                     document.getElementById('output-box').innerText = "❌ Fatal error during run: " + err.message;
                     document.getElementById('status').innerText = "💥 Crashed.";
-                }}
-            }}
+                }
+            }
+
+            // Debug helper: try to fetch Streamlit's user/details endpoint and print the response
+            async function debugStreamlitApi() {
+                const noticeZone = document.getElementById('notice-zone');
+                const origin = window.location.origin;
+                const testPaths = [
+                    '/api/v2/user/details',
+                    '/api/v2/app/status',
+                    '/api/v1/info'
+                ];
+
+                for (const p of testPaths) {
+                    const url = origin + p;
+                    try {
+                        const res = await fetch(url, { credentials: 'include' });
+                        const text = await res.text().catch(() => '<<no-body>>');
+                        const msg = document.createElement('div');
+                        msg.style.marginBottom = '8px';
+                        msg.style.fontFamily = 'monospace';
+                        msg.innerText = `DEBUG: GET ${url} -> ${res.status} ${res.statusText}\n${text}`;
+                        noticeZone.appendChild(msg);
+                    } catch (e) {
+                        const msg = document.createElement('div');
+                        msg.style.marginBottom = '8px';
+                        msg.style.fontFamily = 'monospace';
+                        msg.innerText = `DEBUG: GET ${url} -> NETWORK ERROR: ${e.message}`;
+                        noticeZone.appendChild(msg);
+                    }
+                }
+            }
 
             // Attach event listener natively to module-bound elements
             document.getElementById('encrypt-btn').addEventListener('click', executeCipher);
@@ -165,4 +198,3 @@ run_secure()
     """
     # Render the permanent interface component frame
     components.html(html_code, height=380)
-
