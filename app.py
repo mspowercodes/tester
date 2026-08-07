@@ -272,7 +272,35 @@ run_secure()
 st.write("SERVER DEBUG: rendering simple test HTML below")
 components.html(simple_test_html, height=110)
 
-# Render the complex interactive iframe with placeholders replaced safely with JSON literals
-html_code = complex_html_template.replace("__JS_FLAG_JSON__", js_flag_json).replace("__SAFE_CODE_JSON__", safe_code_json).replace("__SERVER_USER_DEBUG_JSON__", server_user_debug_json)
-st.write("SERVER DEBUG: rendering complex interactive HTML below")
-components.html(html_code, height=640, scrolling=True)
+# # Render the complex interactive iframe with placeholders replaced safely with JSON literals
+# html_code = complex_html_template.replace("__JS_FLAG_JSON__", js_flag_json).replace("__SAFE_CODE_JSON__", safe_code_json).replace("__SERVER_USER_DEBUG_JSON__", server_user_debug_json)
+# st.write("SERVER DEBUG: rendering complex interactive HTML below")
+# components.html(html_code, height=640, scrolling=True)
+
+# 3. Always render the right side so it never disappears or crashes
+with col_right:
+    st.header("2. Test Your Workspace")
+    
+    # Protect raw student text configurations from breaking Javascript strings
+    # Escape backslashes, backticks and '${' so the embedded JS template/backtick strings are safer.
+    safe_code = raw_code_input.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
+
+    # Use a plain triple-quoted string (not an f-string) with placeholders that we replace below.
+    html_template = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body { font-family: sans-serif; background-color: transparent; color: #333; margin: 0; padding: 5px; }
+            .input-group { margin-bottom: 15px; }
+            label { font-size: 0.9em; font-weight: bold; color: #555; display: block; margin-bottom: 5px; }
+            input[type="text"] { width: 95%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; margin-bottom: 10px; }
+            button { background-color: #ff4b4b; color: white; border: none; padding: 10px 15px; font-size: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+            button:hover { background-color: #e03e3e; }
+            #output-box { margin-top: 15px; padding: 15px; border-radius: 8px; background: #ffffff; border: 1px solid #ddd; min-height: 60px; font-family: monospace; white-space: pre-wrap; }
+            .status { font-size: 0.9em; color: #777; margin-bottom: 8px; font-style: italic; }
+            
+            /* Dim treatment to visually lock UI elements before execution initiation */
+            .locked { opacity: 0.4; pointer-events: none; }
+            .info-banner { background-color: #e7f3fe*
+"""
