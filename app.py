@@ -76,7 +76,7 @@ with col_right:
 
         <script type="module">
             // Import Pyodide directly as an isolated module to bypass browser security policies
-            import {{ loadPyodide }} from "https://jsdelivr.net";
+            import {{ loadPyodide }} from "https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.mjs";
 
             let pyEngine = null;
             const isUnlocked = {js_activation_flag};
